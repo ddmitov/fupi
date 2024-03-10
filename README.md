@@ -18,14 +18,6 @@ You can read the story of Fupi [here](https://science.sandiegozoo.org/science-bl
 * **3. No dependency on any AI as a service (AIaaS) like OpenAI**
 * **4. Serverless application model**
 
-## Name
-
-Once upon a time in Kenya a giraffe calf became an orphan during a severe drought and was saved thanks to the kindness and efforts of a knowledgeable animal whisperer. He became so attached to his rescuer, that he often visited him long after he recuperated and was set free.  
-
-Today we are using complex machine learning technologies thanks to the knowledge, persistence and efforts of many people over many years. Just like the small Fupi, we should always be thankful to them! Their contributions are enormous!  
-
-You can read the story of Fupi [here](https://science.sandiegozoo.org/science-blog/lekiji-fupi-and-reteti) and [here](https://www.theguardian.com/artanddesign/2023/jan/11/fupi-orphaned-giraffe-whisperer-ami-vitales-best-photograph).
-
 ## [Thanks and Credits](./CREDITS.md)
 
 ## [License](./LICENSE)

@@ -7,8 +7,6 @@ import multiprocessing
 import os
 import time
 
-# import boto3
-# import botocore
 import lancedb
 from langchain_text_splitters import CharacterTextSplitter
 import numpy as np
@@ -46,7 +44,7 @@ def get_logger():
         level=logging.DEBUG,
         datefmt='%Y-%m-%d %H:%M:%S',
         format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
-        filename='/app/e5_onnx_embedder_03.log',
+        filename='/app/logs/e5_onnx_embedder.log',
         filemode='a'
     )
 
@@ -71,9 +69,6 @@ def main():
 
     onnxrt_options.execution_mode = onnxrt.ExecutionMode.ORT_SEQUENTIAL
     onnxrt_options.intra_op_num_threads = multiprocessing.cpu_count()
-
-    # onnxrt_options.execution_mode = onnxrt.ExecutionMode.ORT_PARALLEL
-    # onnxrt_options.inter_op_num_threads = multiprocessing.cpu_count()
 
     onnxrt_options.graph_optimization_level = (
         onnxrt.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -113,14 +108,6 @@ def main():
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
     os.environ['AWS_ENDPOINT'] = 'http://172.17.0.1:9000'
     os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
-
-    # boto_session = boto3.Session()
-    # boto_session.client(
-    #     's3',
-    #     config=botocore.config.Config(
-    #         s3={'addressing_style': 'path'}
-    #     )
-    # )
 
     # Connect to LanceDB:
     BUCKET_NAME = 'splitting-batching-test'
@@ -242,7 +229,7 @@ def main():
             batch_embedding_time_string = '{:.3f}'.format(batch_embedding_time)
 
             total_time = round(total_time + batch_embedding_time, 3)
-            total_time_string = str(datetime.timedelta(seconds=total_time))   # Create a logger:
+            total_time_string = str(datetime.timedelta(seconds=total_time))
 
             print(
                 f'batch {batch_number}/{total_batches} ' +

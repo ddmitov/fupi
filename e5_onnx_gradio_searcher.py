@@ -2,8 +2,6 @@
 
 import os
 
-# import boto3
-# import botocore
 import gradio as gr
 import lancedb
 from onnxruntime import InferenceSession
@@ -26,14 +24,6 @@ def lancedb_search(search_request: str)-> object:
     os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
     os.environ['AWS_ENDPOINT'] = 'http://172.17.0.1:9000'
     os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
-
-    # boto_session = boto3.Session()
-    # boto_session.client(
-    #     's3',
-    #     config=botocore.config.Config(
-    #         s3={'addressing_style': 'path'}
-    #     )
-    # )
 
     # Define LanceDB table:
     BUCKET_NAME = 'splitting-batching-test'

@@ -5,7 +5,7 @@ Fupi
 
 Fupi is a serverless multilingual semantic search testbed and demo project based on [LanceDB](https://github.com/lancedb/lancedb).  
 
-Once upon a time in Kenya [a giraffe calf was orphaned during a severe drought](https://science.sandiegozoo.org/science-blog/lekiji-fupi-and-reteti) and was saved thanks to the kindness and efforts of a knowledgeable animal whisperer. Named Fupi, he became so attached to his rescuer that [he often visited him long after he recuperated and was set free](https://www.theguardian.com/artanddesign/2023/jan/11/fupi-orphaned-giraffe-whisperer-ami-vitales-best-photograph).  
+Once upon a time in Kenya [a giraffe calf was orphaned during a severe drought](https://science.sandiegozoo.org/science-blog/lekiji-fupi-and-reteti) and was saved thanks to the kindness and efforts of a knowledgeable animal whisperer. Named Fupi, he became so attached to his rescuer that [he visited him long after he recuperated and was set free](https://www.theguardian.com/artanddesign/2023/jan/11/fupi-orphaned-giraffe-whisperer-ami-vitales-best-photograph).  
  
 Today we use complex machine learning technologies thanks to the knowledge, persistence and efforts of many people. Just like the small Fupi, we should always be thankful to them! Their contributions are enormous!  
 

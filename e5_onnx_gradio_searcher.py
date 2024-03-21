@@ -4,44 +4,59 @@ import os
 
 import gradio as gr
 import lancedb
-from onnxruntime import InferenceSession
-from transformers import AutoTokenizer
+# from onnxruntime import InferenceSession
+from optimum.onnxruntime import ORTModelForFeatureExtraction
+from transformers import AutoTokenizer, pipeline
 
-# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_embedder python /app/e5_onnx_gradio_searcher.py
+# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_runner python /app/e5_onnx_gradio_searcher.py
+
+# MinIO object storage settings:
+os.environ['AWS_ACCESS_KEY_ID'] = 'admin'
+os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
+os.environ['AWS_ENDPOINT'] = 'http://172.17.0.1:9000'
+os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+
+# LanceDB settings:
+LANCEDB_BUCKET_NAME = 'text-centroids'
+LANCEDB_TABLE_NAME = 'fupi'
 
 
 def lancedb_search(search_request: str)-> object:
-    # Initialize the embedding model:
-    onnx_session = InferenceSession(
-        '/etc/model/embedder.onnx',
+    # Initialize tokenizer:
+    tokenizer = AutoTokenizer.from_pretrained("/app/data/e5")
+
+    tokenizer_kwargs = {'truncation': True}
+
+    # Initialize embedding model:
+    model = ORTModelForFeatureExtraction.from_pretrained(
+        "/app/data/e5",
         providers=['CPUExecutionProvider']
     )
 
-    tokenizer = AutoTokenizer.from_pretrained('/etc/tokenizer')
-
-    # Prepare an S3 connection:
-    os.environ['AWS_ACCESS_KEY_ID'] = 'admin'
-    os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
-    os.environ['AWS_ENDPOINT'] = 'http://172.17.0.1:9000'
-    os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
-
-    # Define LanceDB table:
-    BUCKET_NAME = 'splitting-batching-test'
-
-    lance_db = lancedb.connect(f's3://{BUCKET_NAME}/')
-    lancedb_table = lance_db.open_table('fupi')
-
-    # Vectorize the search input and search:
-    tokenized_input = tokenizer(
-        search_request,
-        padding='max_length',
-        truncation=True,
-        return_tensors='np'
+    # Initialize transformers pipeline:
+    onnx_extractor = pipeline(
+        "feature-extraction",
+        model=model,
+        tokenizer=tokenizer
     )
 
-    embeddings = onnx_session.run(None, dict(tokenized_input))
+    # Define LanceDB table:
+    lance_db = lancedb.connect(f's3://{LANCEDB_BUCKET_NAME}/')
+    lancedb_table = lance_db.open_table(LANCEDB_TABLE_NAME)
 
-    search_results = lancedb_table.search(embeddings[0][0]).limit(5).to_pandas()
+    # Vectorize the search request:
+    search_request_embeddings = onnx_extractor(
+        search_request,
+        **tokenizer_kwargs
+    )
+
+    # Perform LanceDB search:
+    search_results = (
+        lancedb_table
+        .search(search_request_embeddings[0][0])
+        .limit(5)
+        .to_pandas()
+    )
 
     search_results = search_results.drop(['vector'], axis=1)
 
@@ -49,39 +64,49 @@ def lancedb_search(search_request: str)-> object:
 
 
 def main():
+    input_box=gr.Textbox(lines=1, label='Search Request')
+
+    output_box=gr.JSON(label='Search Results')
+
     interface = gr.Blocks()
 
     with interface:
         gr.Markdown(
             """
-            # LanceDB Semantic Search
-            Search using LanceDB
+            # Fupi Gradio Search
+            ## Serverless multilingual semantic search testbed and demo project  
+            https://github.com/ddmitov/fupi  
+            Dataset: Department of Justice 2009-2018 Press Releases  
+            https://www.kaggle.com/datasets/jbencina/department-of-justice-20092018-press-releases  
+            Model: intfloat/multilingual-e5-large  
+            https://huggingface.co/intfloat/multilingual-e5-large  
             """
         )
 
         with gr.Row():
-            input=gr.Textbox(
-                lines=1,
-                label='Search Request'
-            )
-        
-        search_button = gr.Button("Search")
+            input_box.render()
 
         with gr.Row():
-            output=gr.JSON(label='Search Results')
+            search_button = gr.Button("Search")
+
+            gr.ClearButton([input_box, output_box])
+
+        with gr.Row():
+            gr.Examples(
+                [['злоупотреби в Калифорния']],
+                fn=lancedb_search,
+                inputs=input_box,
+                outputs=output_box,
+                cache_examples=False
+            )
+
+        with gr.Row():
+            output_box.render()
 
         search_button.click(
             lancedb_search,
-            inputs=input,
-            outputs=output
-        )
-
-        gr.Examples(
-            [['злоупотреби в Калифорния']],
-            fn=lancedb_search,
-            inputs=input,
-            outputs=output,
-            cache_examples=False
+            inputs=input_box,
+            outputs=output_box
         )
 
     interface.launch(
@@ -92,7 +117,6 @@ def main():
         inline=False,
         inbrowser=False
     )
-
 
 
 if __name__ == '__main__':

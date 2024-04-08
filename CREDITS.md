@@ -13,6 +13,9 @@ https://lancedb.github.io/lancedb/
 
 https://huggingface.co/intfloat/multilingual-e5-large  
 https://huggingface.co/Qdrant/multilingual-e5-large-onnx  
+https://huggingface.co/BAAI/bge-m3  
+https://huggingface.co/aapot/bge-m3-onnx  
+https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx  
 
 ## ONNX
 
@@ -26,9 +29,10 @@ https://huggingface.co/docs/transformers/serialization
 https://huggingface.co/docs/optimum/v1.2.1/en/onnxruntime/modeling_ort  
 https://huggingface.co/docs/optimum/onnxruntime/usage_guides/pipelines  
 
-## Dataset
+## Datasets
 
 https://www.kaggle.com/datasets/jbencina/department-of-justice-20092018-press-releases  
+https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
 
 ## Papers
 

@@ -172,8 +172,6 @@ def main():
     colbert_table_schema = pa.schema([
         pa.field('text_id',           pa.int64()),
         pa.field('sentence_id',       pa.int64()),
-        pa.field('date',              pa.date32()),
-        pa.field('sentence',          pa.utf8()),
         pa.field('colbert_embedding', pa.list_(pa.float32(), 1024))
     ])
 
@@ -272,8 +270,6 @@ def main():
 
                         colbert_item['text_id']           = item['text_id']
                         colbert_item['sentence_id']       = sentence_number
-                        colbert_item['date']              = item['date']
-                        colbert_item['sentence']          = sentence
                         colbert_item['embedding_id']      = colbert_embeddings_number
                         colbert_item['colbert_embedding'] = colbert_embedding
 
@@ -362,8 +358,6 @@ def main():
                     ]
                 ).agg(
                     {
-                        'date': ['first'],
-                        'sentence': ['first'],
                         'colbert_embedding': [centroid_maker]
                     }
                 )

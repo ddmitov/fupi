@@ -3,6 +3,7 @@
 import os
 import multiprocessing
 
+import duckdb
 import gradio as gr
 import lancedb
 from minio import Minio
@@ -59,7 +60,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
         '/tmp/model/'
     )
 
-    # Define LanceDB table:
+    # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{LANCEDB_BUCKET_NAME}/')
 
     dense_table = lance_db.open_table('dense')
@@ -116,15 +117,37 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     if (search_type == 'ColBERT Vectors'):
         query_colbert_centroid = centroid_maker(query_colbert_embeddings)
 
-        colbert_result = colbert_table.search(
+        colbert_result_dataframe = colbert_table.search(
             query_colbert_centroid,
             vector_column_name='colbert_embedding'
         )\
-        .select(['text_id', 'sentence_id', 'date', 'sentence'])\
+        .select(['text_id'])\
         .limit(5)\
         .to_pandas()
 
-        search_result = colbert_result.to_dict('records')
+        text_id_list = colbert_result_dataframe['text_id'].unique().tolist()
+
+        text_id_string = (
+            '\'' +
+            '\', \''.join(map(str, text_id_list)) +
+            '\''
+        )
+
+        dense_arrow_table = dense_table.to_lance()
+
+        colbert_final_result_dataframe = duckdb.query(
+            f'''
+                SELECT
+                    text_id,
+                    date,
+                    title,
+                    text
+                FROM dense_arrow_table
+                WHERE text_id IN ({text_id_string})
+            '''
+        ).fetch_arrow_table().to_pandas()
+
+        search_result = colbert_final_result_dataframe.to_dict('records')
 
     return search_result
 
@@ -180,32 +203,51 @@ def main():
 
     interface = gr.Blocks(
         theme=gr.themes.Glass(),
-        title='Fupi Search'
+        title='Fupi'
     )
 
     with interface:
-        gr.Markdown(
-            """
-            # Fupi
-            ## Serverless multilingual semantic search testbed and demo
-              
-            **GitHub:** https://github.com/ddmitov/fupi
-              
-            **Dataset:** Common Crawl News  
-            https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
-            https://commoncrawl.org/blog/news-dataset-available  
-              
-            **Model:** BGE-M3  
-            https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx  
-            """
-        )
+        with gr.Row():
+            gr.Markdown(
+                """
+                # Fupi
+                ## Serverless multilingual semantic search
+                """
+            )
 
         with gr.Row():
-            with gr.Column(scale=75):
-                input_box.render()
+            with gr.Column(scale=30):
+                gr.Markdown(
+                    """
+                    **License:** Apache License 2.0.  
+                    **Repository:** https://github.com/ddmitov/fupi  
+                    """
+                )
 
-            with gr.Column(scale=25):
+            with gr.Column(scale=40):
+                gr.Markdown(
+                    """
+                    **Dataset:** Common Crawl News  
+                    https://commoncrawl.org/blog/news-dataset-available  
+                    https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
+                    """
+                )
+
+            with gr.Column(scale=30):
+                gr.Markdown(
+                    """
+                    **Model:** BGE-M3  
+                    https://huggingface.co/BAAI/bge-m3  
+                    https://huggingface.co/aapot/bge-m3-onnx  
+                    https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx  
+                    """
+                )
+
+        with gr.Row():
                 search_type.render()
+
+        with gr.Row():
+            input_box.render()
 
         with gr.Row():
             gr.Examples(

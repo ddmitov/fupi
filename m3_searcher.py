@@ -23,6 +23,8 @@ os.environ['AWS_ACCESS_KEY_ID'] = 'admin'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
 os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
 
+os.environ['ALLOW_HTTP'] = 'True'
+
 # LanceDB settings:
 LANCEDB_BUCKET_NAME = 'bge-m3'
 
@@ -63,8 +65,8 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{LANCEDB_BUCKET_NAME}/')
 
-    dense_table = lance_db.open_table('dense')
-    colbert_table = lance_db.open_table('colbert')
+    text_level_table = lance_db.open_table('text-level')
+    sentence_level_table = lance_db.open_table('sentence-level')
 
     # Vectorize the search request:
     query_tokenized_input = tokenizer(
@@ -81,43 +83,49 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     query_outputs = ort_session.run(None, query_onnx_input)
 
     query_dense_embedding = query_outputs[0][0]
-    query_colbert_embeddings = list(query_outputs[1][0])
+    query_colbert_embeddings = query_outputs[1][0]
 
-    # Perform LanceDB search:
     search_result = None
 
-    if (search_type == 'Dense Vectors'):
-        dense_result = dense_table.search(
+    # Sentence-level dense vector search:
+    if (search_type == 'Dense Vectors - Sentence Level'):
+        dense_sentence_result = sentence_level_table.search(
             query_dense_embedding.tolist(),
             vector_column_name='dense_embedding'
         )\
-        .select(['text_id', 'date', 'title', 'text'])\
+        .select(['text_id'])\
         .limit(5)\
         .to_pandas()
 
-        search_result = dense_result.to_dict('records')
+        text_id_list = dense_sentence_result['text_id'].unique().tolist()
 
-    if (search_type == 'Dense Binary Vectors'):
-        query_dense_binary_embedding = quantize_embeddings(
-            FloatTensor(query_dense_embedding).reshape(1, -1),
-            precision='binary'
-        ).tolist()[0]
+        text_id_string = (
+            '\'' +
+            '\', \''.join(map(str, text_id_list)) +
+            '\''
+        )
 
-        dense_binary_result = dense_table.search(
-            query_dense_binary_embedding,
-            vector_column_name='dense_embedding_binary'
-        )\
-        .metric('dot')\
-        .select(['text_id', 'date', 'title', 'text'])\
-        .limit(5)\
-        .to_pandas()
+        text_level_arrow_table = text_level_table.to_lance()
 
-        search_result = dense_binary_result.to_dict('records')
+        dense_sentence_result_dataframe = duckdb.query(
+            f'''
+                SELECT
+                    text_id,
+                    date,
+                    title,
+                    text
+                FROM text_level_arrow_table
+                WHERE text_id IN ({text_id_string})
+            '''
+        ).fetch_arrow_table().to_pandas()
 
-    if (search_type == 'ColBERT Vectors'):
+        search_result = dense_sentence_result_dataframe.to_dict('records')
+
+    # Sentence-level ColBERT vector search:
+    if (search_type == 'ColBERT Centroids - Sentence Level'):
         query_colbert_centroid = centroid_maker(query_colbert_embeddings)
 
-        colbert_result_dataframe = colbert_table.search(
+        colbert_result_dataframe = sentence_level_table.search(
             query_colbert_centroid,
             vector_column_name='colbert_embedding'
         )\
@@ -133,7 +141,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
             '\''
         )
 
-        dense_arrow_table = dense_table.to_lance()
+        text_level_arrow_table = text_level_table.to_lance()
 
         colbert_final_result_dataframe = duckdb.query(
             f'''
@@ -142,12 +150,24 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                     date,
                     title,
                     text
-                FROM dense_arrow_table
+                FROM text_level_arrow_table
                 WHERE text_id IN ({text_id_string})
             '''
         ).fetch_arrow_table().to_pandas()
 
         search_result = colbert_final_result_dataframe.to_dict('records')
+
+    # Text-level dense vector search:
+    if (search_type == 'Dense Centroids - Text Level'):
+        dense_result = text_level_table.search(
+            query_dense_embedding.tolist(),
+            vector_column_name='dense_embedding'
+        )\
+        .select(['text_id', 'date', 'title', 'text'])\
+        .limit(5)\
+        .to_pandas()
+
+        search_result = dense_result.to_dict('records')
 
     return search_result
 
@@ -191,12 +211,12 @@ def main():
 
     search_type = gr.Radio(
         [
-            'Dense Vectors',
-            'Dense Binary Vectors',
-            'ColBERT Vectors'
+            'Dense Vectors - Sentence Level',
+            'ColBERT Centroids - Sentence Level',
+            'Dense Centroids - Text Level',
         ],
-        value='Dense Vectors',
-        label="Search Type",
+        value='Dense Vectors - Sentence Level',
+        label='Type of Search',
     )
 
     output_box=gr.JSON(label='Search Results', show_label=True)
@@ -252,8 +272,9 @@ def main():
         with gr.Row():
             gr.Examples(
                 [
-                    ['economic growth'],
-                    ['environmental impact']
+                    'economic recovery after the pandemic',
+                    'environmental impact',
+                    'economic growth'
                 ],
                 fn=lancedb_searcher,
                 inputs=input_box,

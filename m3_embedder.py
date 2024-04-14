@@ -9,6 +9,7 @@ import time
 import duckdb
 from huggingface_hub import hf_hub_download
 import lancedb
+from minio import Minio
 from nltk.tokenize import sent_tokenize
 import numpy as np
 import onnxruntime as ort
@@ -24,31 +25,26 @@ from transformers import AutoTokenizer
 INPUT_ITEMS_PER_BATCH = 100
 
 # MinIO local object storage settings:
+S3_ENDPOINT = '172.17.0.2:9000'
+
+os.environ['AWS_ENDPOINT'] = f'http://{S3_ENDPOINT}'
 os.environ['AWS_ACCESS_KEY_ID'] = 'admin'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
-os.environ['AWS_ENDPOINT'] = 'http://172.17.0.1:9000'
 os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+
+os.environ['ALLOW_HTTP'] = 'True'
 
 # LanceDB settings:
 LANCEDB_BUCKET_NAME = 'bge-m3'
 
 
-def embeddings_binarizer(row, column_name):
-    dense_embedding_list = row[column_name]
+def centroid_maker_for_lists(embeddings_list: list[list]) -> list:
+    average_embedding_list = np.average(embeddings_list, axis=0).tolist()
 
-    dense_embedding_tensor = FloatTensor(
-        dense_embedding_list
-    )
-
-    binary_embedding = quantize_embeddings(
-        dense_embedding_tensor.reshape(1, -1),
-        precision='binary'
-    ).tolist()[0]
-
-    return binary_embedding
+    return average_embedding_list
 
 
-def centroid_maker(group: pd.Series) -> list:
+def centroid_maker_for_series(group: pd.Series) -> list:
     embeddings_list = group.tolist()
 
     average_embedding_list = np.average(embeddings_list, axis=0).tolist()
@@ -65,6 +61,53 @@ def newlines_remover(text: str) -> str:
     return text.replace('\n', ' ')
 
 
+def hugging_face_model_downloader() -> True:
+    hf_hub_download(
+        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
+        filename='model.onnx',
+        local_dir='/tmp/model',
+        repo_type='model'
+    )
+
+    hf_hub_download(
+        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
+        filename='model.onnx_data',
+        local_dir='/tmp/model',
+        repo_type='model'
+    )
+
+    return True
+
+
+def object_storage_model_downloader(
+    bucket_name: str,
+    bucket_prefix: str
+) -> True:
+    client = Minio(
+        S3_ENDPOINT,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=False
+    )
+
+    for item in client.list_objects(
+        bucket_name,
+        prefix=bucket_prefix,
+        recursive=True
+    ):
+        print(item.object_name)
+
+        client.fget_object(
+            bucket_name,
+            item.object_name,
+            '/tmp/' + item.object_name
+        )
+
+    print('')
+
+    return True
+
+
 def logger_starter():
     start_datetime_string = (
         datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -74,7 +117,7 @@ def logger_starter():
         level=logging.DEBUG,
         datefmt='%Y-%m-%d %H:%M:%S',
         format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
-        filename=f'/app/data/logs/m3_onnx_embedder_{start_datetime_string}.log',
+        filename=f'/app/data/logs/m3_embedder_{start_datetime_string}.log',
         filemode='a'
     )
 
@@ -89,6 +132,10 @@ def main():
     total_time = 0
 
     # Download testing data from a Hugging Face dataset:
+    print('')
+    print('Downloading testing data from Hugging Face ...')
+    print('')
+
     hf_hub_download(
         repo_id='CloverSearch/cc-news-mutlilingual',
         filename='2021/bg.jsonl.gz',
@@ -116,20 +163,18 @@ def main():
         '''
     ).to_arrow_table().to_pylist()
 
-    # Download embedding model from Hugging Face:
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx',
-        local_dir='/tmp',
-        repo_type='model'
-    )
+    # Download the embedding model:
+    print('')
+    print('Downloading the BGE-M3 embedding model from object storage ...')
+    print('')
 
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx_data',
-        local_dir='/tmp',
-        repo_type='model'
-    )
+    object_storage_model_downloader('bge-m3', 'model')
+
+    # print('')
+    # print('Downloading the BGE-M3 embedding model from Hugging Face ...')
+    # print('')
+
+    # hugging_face_model_downloader()
 
     # Set ONNX runtime session configuration:
     onnxrt_options = ort.SessionOptions()
@@ -147,43 +192,49 @@ def main():
 
     # Initialize ONNX runtime session:
     ort_session = ort.InferenceSession(
-        '/tmp/model.onnx',
+        '/tmp/model/model.onnx',
         sess_ptions=onnxrt_options,
         providers=['CPUExecutionProvider']
     )
 
     # Initialize tokenizer:
     tokenizer = AutoTokenizer.from_pretrained(
-        'ddmitov/bge_m3_dense_colbert_onnx'
+        '/tmp/model/'
     )
 
     # Create LanceDB tables:
     lance_db = lancedb.connect(f's3://{LANCEDB_BUCKET_NAME}/')
 
-    dense_table_schema = pa.schema([
-        pa.field('text_id',                pa.int64()),
-        pa.field('date',                   pa.date32()),
-        pa.field('title',                  pa.utf8()),
-        pa.field('text',                   pa.utf8()),
-        pa.field('dense_embedding',        pa.list_(pa.float32(), 1024)),
-        pa.field('dense_embedding_binary', pa.list_(pa.float32(), 128))
-    ])
+    # Define LanceDB table schemas:
+    text_level_table_schema = pa.schema(
+        [
+            pa.field('text_id',         pa.int64()),
+            pa.field('date',            pa.date32()),
+            pa.field('title',           pa.utf8()),
+            pa.field('text',            pa.utf8()),
+            pa.field('dense_embedding', pa.list_(pa.float32(), 1024))
+        ]
+    )
 
-    colbert_table_schema = pa.schema([
-        pa.field('text_id',           pa.int64()),
-        pa.field('sentence_id',       pa.int64()),
-        pa.field('colbert_embedding', pa.list_(pa.float32(), 1024))
-    ])
+    sentence_level_table_schema = pa.schema(
+        [
+            pa.field('text_id',                pa.int64()),
+            pa.field('sentence_id',            pa.int64()),
+            pa.field('dense_embedding',        pa.list_(pa.float32(), 1024)),
+            pa.field('colbert_embedding',      pa.list_(pa.float32(), 1024))
+        ]
+    )
 
-    dense_table = lance_db.create_table(
-        'dense',
-        schema=dense_table_schema,
+    # Initialize LanceDB tables:
+    text_level_table = lance_db.create_table(
+        'text-level',
+        schema=text_level_table_schema,
         mode='overwrite'
     )
 
-    colbert_table = lance_db.create_table(
-        'colbert',
-        schema=colbert_table_schema,
+    sentence_level_table = lance_db.create_table(
+        'sentence-level',
+        schema=sentence_level_table_schema,
         mode='overwrite'
     )
 
@@ -201,19 +252,18 @@ def main():
         batch_number = 0
         total_batches = len(batch_list)
 
-        # Iterate over all batches:
+        # Iterate over all batches of texts:
         for batch in batch_list:
             batch_embedding_start = time.time()
 
             batch_number += 1
 
-            # Produce Dense and ColBERT embeddings:
             text_list = []
-            dense_results_list = []
-            colbert_results_list = []
+            sentence_list = []
 
             item_number = 0
 
+            # Iterate over all texts:
             for item in batch:
                 item_number += 1
 
@@ -223,6 +273,7 @@ def main():
                     str(item['title']) + '. ' + str(item['text'])
                 )
 
+                # Get text-level table data without embeddings:
                 text_item = {}
 
                 text_item['text_id'] = item['text_id']
@@ -230,20 +281,24 @@ def main():
                 text_item['title']   = item['title']
                 text_item['text']    = item['text']
 
+                # Prepare text-level list of dictionaries:
                 text_list.append(text_item)
 
                 total_sentences = len(sentences)
                 sentence_number = 0
 
+                # Iterate over all sentences in a text:
                 for sentence in sentences:
                     sentence_number += 1
 
+                    # Tokenize input sentence:
                     tokenized_input = tokenizer(
                         sentence,
                         truncation=True,
                         return_tensors='np'
                     )
 
+                    # Get sentence-level embeddings:
                     onnx_input = {
                         key: ort.OrtValue.ortvalue_from_numpy(value)
                         for key, value in tokenized_input.items()
@@ -251,30 +306,31 @@ def main():
 
                     outputs = ort_session.run(None, onnx_input)
 
-                    dense_item = {}
+                    # Get sentence-level dense data:
+                    dense_embedding = outputs[0][0]
 
-                    dense_item['text_id']         = item['text_id']
-                    dense_item['sentence_id']     = sentence_number
-                    dense_item['dense_embedding'] = outputs[0][0]
+                    sentence_item = {}
 
-                    dense_results_list.append(dense_item)
+                    sentence_item['text_id']         = item['text_id']
+                    sentence_item['sentence_id']     = sentence_number
+                    sentence_item['dense_embedding'] = dense_embedding
 
+                    # Get sentence-level ColBERT data:
                     colbert_embeddings = outputs[1][0]
 
-                    colbert_embeddings_number = 0
+                    # ColBERT embeddings for sentences are
+                    # centroids of the multiple ColBERT embeddings
+                    # produced for every sentence:
+                    colbert_centroid = (
+                        centroid_maker_for_lists(colbert_embeddings)
+                    )
 
-                    for colbert_embedding in colbert_embeddings:
-                        colbert_embeddings_number += 1
+                    sentence_item['colbert_embedding'] = colbert_centroid
 
-                        colbert_item = {}
+                    # Prepare sentence-level list of dictionaries:
+                    sentence_list.append(sentence_item)
 
-                        colbert_item['text_id']           = item['text_id']
-                        colbert_item['sentence_id']       = sentence_number
-                        colbert_item['embedding_id']      = colbert_embeddings_number
-                        colbert_item['colbert_embedding'] = colbert_embedding
-
-                        colbert_results_list.append(colbert_item)
-
+                    # Log sentence embedding data:
                     print(
                         f'batch {batch_number}/{total_batches} - ' +
                         f'item {item_number}/{INPUT_ITEMS_PER_BATCH} - ' +
@@ -287,6 +343,7 @@ def main():
                         f'sentence {sentence_number}/{total_sentences}'
                     )
 
+                # Get runtime data for logging:
                 item_embedding_end = time.time()
 
                 item_embedding_time = round(
@@ -314,62 +371,42 @@ def main():
                     f'embedded for {item_embedding_time_string}'
                 )
 
+            # Create dataframes for LanceDB table data:
             text_dataframe = pd.DataFrame(text_list)
 
-            dense_dataframe = pd.DataFrame(dense_results_list)
+            sentence_dataframe = pd.DataFrame(sentence_list)
 
-            colbert_dataframe = pd.DataFrame(colbert_results_list)
-
-            aggregated_dense_dataframe = (
-                dense_dataframe.groupby(
+            # Prepare text-level LanceDB table data.
+            # Dense embeddings for whole texts are
+            # centroids of the dense embeddings of
+            # the corresponding sentences from the sentence-level table:
+            aggregated_text_dataframe = (
+                sentence_dataframe.groupby(
                     [
                         'text_id'
                     ]
                 ).agg(
                     {
-                        'dense_embedding': [centroid_maker]
+                        'dense_embedding': [centroid_maker_for_series]
                     }
                 )
             ).reset_index()
 
-            aggregated_dense_dataframe.columns = (
-                aggregated_dense_dataframe.columns.get_level_values(0)
+            aggregated_text_dataframe.columns = (
+                aggregated_text_dataframe.columns.get_level_values(0)
             )
 
-            aggregated_dense_dataframe['dense_embedding_binary'] = (
-                aggregated_dense_dataframe.apply(
-                    lambda row: embeddings_binarizer(row, 'dense_embedding'),
-                    axis=1
-                )
-            )
-
-            combined_dense_dataframe = pd.merge(
+            combined_text_dataframe = pd.merge(
                 text_dataframe,
-                aggregated_dense_dataframe,
+                aggregated_text_dataframe,
                 on='text_id',
                 how='left'
             )
 
-            aggregated_colbert_dataframe = (
-                colbert_dataframe.groupby(
-                    [
-                        'text_id',
-                        'sentence_id'
-                    ]
-                ).agg(
-                    {
-                        'colbert_embedding': [centroid_maker]
-                    }
-                )
-            ).reset_index()
+            # Add data to the LanceDB tables:
+            text_level_table.add(combined_text_dataframe.to_dict('records'))
 
-            aggregated_colbert_dataframe.columns = (
-                aggregated_colbert_dataframe.columns.get_level_values(0)
-            )
-
-            dense_table.add(combined_dense_dataframe.to_dict('records'))
-
-            colbert_table.add(aggregated_colbert_dataframe.to_dict('records'))
+            sentence_level_table.add(sentence_dataframe.to_dict('records'))
 
             # Calculate and log batch processing time:
             batch_embedding_end = time.time()
@@ -386,7 +423,6 @@ def main():
             total_time = round(total_time + batch_embedding_time, 3)
             total_time_string = str(datetime.timedelta(seconds=total_time))
 
-            print('')
             print(
                 f'batch {batch_number}/{total_batches} ' +
                 f'embedded for {batch_embedding_time_string}'

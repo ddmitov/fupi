@@ -14,6 +14,7 @@ RUN pip install --no-cache \
     onnxruntime \
     pandas \
     pyarrow \
+    python-dotenv \
     sentencepiece \
     sentence-transformers \
     transformers

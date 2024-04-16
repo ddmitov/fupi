@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import time
 
+from dotenv import load_dotenv, find_dotenv
 import duckdb
 from huggingface_hub import hf_hub_download
 import lancedb
@@ -15,27 +16,22 @@ import numpy as np
 import onnxruntime as ort
 import pandas as pd
 import pyarrow as pa
-from sentence_transformers.quantization import quantize_embeddings
-from torch import FloatTensor
 from transformers import AutoTokenizer
 
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app onnx_runner python /app/m3_embedder.py
 
-# Input data settings:
-INPUT_ITEMS_PER_BATCH = 100
+# Load settings from .env file:
+load_dotenv(find_dotenv())
 
 # MinIO local object storage settings:
-S3_ENDPOINT = '172.17.0.2:9000'
-
-os.environ['AWS_ENDPOINT'] = f'http://{S3_ENDPOINT}'
-os.environ['AWS_ACCESS_KEY_ID'] = 'admin'
-os.environ['AWS_SECRET_ACCESS_KEY'] = 'password'
-os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
-
+os.environ['AWS_ENDPOINT'] = f'http://{os.environ['S3_ENDPOINT']}'
 os.environ['ALLOW_HTTP'] = 'True'
 
 # LanceDB settings:
 LANCEDB_BUCKET_NAME = 'bge-m3'
+
+# Input data settings:
+INPUT_ITEMS_PER_BATCH = 100
 
 
 def centroid_maker_for_lists(embeddings_list: list[list]) -> list:
@@ -84,7 +80,7 @@ def object_storage_model_downloader(
     bucket_prefix: str
 ) -> True:
     client = Minio(
-        S3_ENDPOINT,
+        os.environ['S3_ENDPOINT'],
         access_key=os.environ['AWS_ACCESS_KEY_ID'],
         secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
         secure=False

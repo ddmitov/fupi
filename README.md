@@ -13,7 +13,7 @@ Today we use complex machine learning technologies thanks to the knowledge, pers
 
 * **1. Multilingual semantic search, incl. ability to search using one language in texts of another language**  
 * **2. Minimal or no dependency on GPUs, TPUs or other specialized hardware**  
-* **3. No dependency on AI as a service (AIaaS) like OpenAI, Cohere etc.**
+* **3. No dependency on AI as a service (AIaaS) for production of embeddings**
 * **4. Serverless application model**
 
 ## [Thanks and Credits](./CREDITS.md)

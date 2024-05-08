@@ -18,7 +18,8 @@ def main():
 
     weighted_tokens_table = lance_db.open_table('weighted-tokens')
 
-    weighted_tokens_table.create_scalar_index('token', replace=True)
+    weighted_tokens_table.create_scalar_index('token',   replace=True)
+    weighted_tokens_table.create_scalar_index('text_id', replace=True)
 
 
 if __name__ == '__main__':

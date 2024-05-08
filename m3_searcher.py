@@ -2,6 +2,7 @@
 
 import os
 from multiprocessing import cpu_count
+import time
 
 from dotenv import load_dotenv, find_dotenv
 import duckdb
@@ -21,7 +22,7 @@ load_dotenv(find_dotenv())
 
 # Globals:
 onnx_runtime_session = None
-tokenizer = None
+tokenizer            = None
 
 sentence_level_table  = None
 text_level_table      = None
@@ -57,6 +58,9 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     global text_level_arrow_table
     global weighted_tokens_arrow_table
 
+    # Start measuring tokenization and embedding time:
+    embedding_start_time = time.time()
+
     # Tokenize the search request:
     query_tokenized = tokenizer(
         search_request,
@@ -72,6 +76,10 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
     query_embedded = onnx_runtime_session.run(None, query_onnx_runtime_input)
 
+    # Stop measuring tokenization and embedding time:
+    embedding_time = time.time() - embedding_start_time
+
+    # Get query embeddings:
     query_dense_embedding    = query_embedded[0][0]
     query_colbert_embeddings = query_embedded[1][0]
 
@@ -79,6 +87,9 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
     # Dense vector search:
     if (search_type == 'Sentence Dense Vector'):
+        # Start measuring searching time:
+        searching_start_time = time.time()
+
         dense_initial_dataframe = sentence_level_table.search(
             query_dense_embedding.tolist(),
             vector_column_name='dense_embedding'
@@ -133,8 +144,14 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
         search_result = dense_final_dataframe.to_dict('records')
 
+        # Stop measuring searching time:
+        searching_time = time.time() - searching_start_time 
+
     # ColBERT vector search:
     if (search_type == 'Sentence ColBERT Centroid'):
+        # Start measuring searching time:
+        searching_start_time = time.time()
+
         query_colbert_centroid = centroid_maker(query_colbert_embeddings)
 
         colbert_initial_dataframe = sentence_level_table.search(
@@ -191,8 +208,14 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
         search_result = colbert_final_dataframe.to_dict('records')
 
+        # Stop measuring searching time:
+        searching_time = time.time() - searching_start_time 
+
     # Weighted Tokens search:
     if (search_type == 'Weighted Tokens'):
+        # Start measuring searching time:
+        searching_start_time = time.time()
+
         token_list = list(query_tokenized['input_ids'].tolist())[0]
 
         unused_tokens = set(
@@ -281,8 +304,14 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
         search_result = weighted_tokens_result_dataframe.to_dict('records')
 
+        # Stop measuring searching time:
+        searching_time = time.time() - searching_start_time 
+
     # ColBERT and Tokens search:
     if (search_type == 'CoaT - ColBERT and Tokens'):
+        # Start measuring searching time:
+        searching_start_time = time.time()
+
         result_dataframes_list = []
 
         for query_colbert_embedding in query_colbert_embeddings:
@@ -409,7 +438,16 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
         search_result = combined_dataframe.to_dict('records')
 
-    return search_result
+        # Stop measuring searching time:
+        searching_time = time.time() - searching_start_time 
+
+    search_info = {
+        "Embedding Time": f"{embedding_time:.3f} s",
+        "Searching Time": f"{searching_time:.3f} s",
+        "Total Time":     f"{embedding_time + searching_time:.3f} s",
+    }
+
+    return search_info, search_result
 
 
 def s3_downloader(bucket_name, bucket_prefix):
@@ -504,7 +542,7 @@ def main():
     weighted_tokens_arrow_table = weighted_tokens_table.to_lance()
 
     # Define Gradio user interface:
-    input_box=gr.Textbox(lines=1, label='Search Request')
+    search_request_box=gr.Textbox(lines=1, label='Search Request')
 
     search_type = gr.Radio(
         [
@@ -517,7 +555,9 @@ def main():
         label='Search Base',
     )
 
-    output_box=gr.JSON(label='Search Results', show_label=True)
+    search_info_box=gr.JSON(label='Search Info', show_label=True)
+
+    search_results_box=gr.JSON(label='Search Results', show_label=True)
 
     global gradio_interface
     gradio_interface = gr.Blocks(theme=gr.themes.Glass(), title='Fupi')
@@ -562,7 +602,7 @@ def main():
                 search_type.render()
 
         with gr.Row():
-            input_box.render()
+            search_request_box.render()
 
         with gr.Row():
             gr.Examples(
@@ -575,30 +615,42 @@ def main():
                     'environmental impact',
                 ],
                 fn=lancedb_searcher,
-                inputs=input_box,
-                outputs=output_box,
+                inputs=search_request_box,
+                outputs=search_results_box,
                 cache_examples=False
             )
 
         with gr.Row():
             search_button = gr.Button("Search")
 
-            gr.ClearButton([input_box, output_box])
+            gr.ClearButton(
+                [
+                    search_info_box,
+                    search_request_box,
+                    search_results_box
+                ]
+            )
 
         with gr.Row():
-            output_box.render()
+            search_info_box.render()
+
+        with gr.Row():
+            search_results_box.render()
 
         gr.on(
             triggers=[
-                input_box.submit,
+                search_request_box.submit,
                 search_button.click
             ],
             fn=lancedb_searcher,
             inputs=[
-                input_box,
+                search_request_box,
                 search_type
             ],
-            outputs=output_box,
+            outputs=[
+                search_info_box,
+                search_results_box
+            ],
         )
 
     gradio_interface.launch(

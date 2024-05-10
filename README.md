@@ -5,7 +5,7 @@ Fupi is a serverless multilingual semantic search system based on [LanceDB](http
   
 <img align="left" width="100" height="100" src="assets/fupi_svgrepo_com.png">
   
-Once upon a time [a giraffe calf was orphaned during a severe drought(https://science.sandiegozoo.org/science-blog/lekiji-fupi-and-reteti) and was saved thanks to the kindness and efforts of the local community and a knowledgeable animal whisperer]. [Named Fupi, he became so attached to his rescuer that he visited him frequently long after he recuperated and was set free](https://www.theguardian.com/artanddesign/2023/jan/11/fupi-orphaned-giraffe-whisperer-ami-vitales-best-photograph).  
+Once upon a time [a giraffe calf was orphaned during a severe drought and was saved thanks to the kindness and efforts of the local community and a knowledgeable animal whisperer](https://science.sandiegozoo.org/science-blog/lekiji-fupi-and-reteti). [Named Fupi, he became so attached to his rescuer that he visited him frequently long after he recuperated and was set free](https://www.theguardian.com/artanddesign/2023/jan/11/fupi-orphaned-giraffe-whisperer-ami-vitales-best-photograph).  
   
 Today we use complex machine learning technologies thanks to the knowledge, persistence and efforts of many people. Just like the small Fupi, we should always be thankful to them for their goodwill and contributions!  
 

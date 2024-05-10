@@ -11,7 +11,6 @@ import lancedb
 from minio import Minio
 import numpy as np
 import onnxruntime as ort
-import pandas as pd
 from transformers import AutoTokenizer
 
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_runner python /app/m3_searcher.py
@@ -85,10 +84,10 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
     search_result = None
 
-    # Dense vector search:
-    if (search_type == 'Sentence Dense Vector'):
-        # Start measuring searching time:
-        searching_start_time = time.time()
+    # Dense vectors search:
+    if (search_type == 'Sentence Dense Vectors'):
+        # Start measuring search time:
+        search_start_time = time.time()
 
         dense_initial_dataframe = sentence_level_table.search(
             query_dense_embedding.tolist(),
@@ -118,6 +117,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                         FROM dense_initial_dataframe did
                             JOIN text_level_arrow_table tlat ON
                                 tlat.text_id = did.text_id
+                        WHERE LENGTH(did.sentence) > 3
                         ORDER BY
                             did.text_id ASC,
                             did.sentence_id ASC
@@ -137,20 +137,26 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                     text_id,
                     date,
                     title
-                ORDER BY distance DESC
+                ORDER BY distance ASC
                 LIMIT 10
             '''
         ).fetch_arrow_table().to_pandas()
 
         search_result = dense_final_dataframe.to_dict('records')
 
-        # Stop measuring searching time:
-        searching_time = time.time() - searching_start_time 
+        # Stop measuring search time:
+        search_time = time.time() - search_start_time 
 
-    # ColBERT vector search:
-    if (search_type == 'Sentence ColBERT Centroid'):
-        # Start measuring searching time:
-        searching_start_time = time.time()
+        search_info = {
+            'Embedding Time': f'{embedding_time:.3f} s',
+            'Search Time':    f'{search_time:.3f} s',
+            'Total Time':     f'{embedding_time + search_time:.3f} s',
+        }
+
+    # ColBERT Centroids search:
+    if (search_type == 'Sentence ColBERT Centroids'):
+        # Start measuring search time:
+        search_start_time = time.time()
 
         query_colbert_centroid = centroid_maker(query_colbert_embeddings)
 
@@ -182,6 +188,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                         FROM colbert_initial_dataframe cid
                             JOIN text_level_arrow_table tlat ON
                                 tlat.text_id = cid.text_id
+                        WHERE LENGTH(cid.sentence) > 3
                         ORDER BY
                             cid.text_id ASC,
                             cid.sentence_id ASC
@@ -201,20 +208,26 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                     text_id,
                     date,
                     title
-                ORDER BY distance DESC
+                ORDER BY distance ASC
                 LIMIT 10
             '''
         ).fetch_arrow_table().to_pandas()
 
         search_result = colbert_final_dataframe.to_dict('records')
 
-        # Stop measuring searching time:
-        searching_time = time.time() - searching_start_time 
+        # Stop measuring search time:
+        search_time = time.time() - search_start_time 
+
+        search_info = {
+            'Embedding Time': f'{embedding_time:.3f} s',
+            'Search Time':    f'{search_time:.3f} s',
+            'Total Time':     f'{embedding_time + search_time:.3f} s',
+        }
 
     # Weighted Tokens search:
     if (search_type == 'Weighted Tokens'):
-        # Start measuring searching time:
-        searching_start_time = time.time()
+        # Start measuring search time:
+        search_start_time = time.time()
 
         token_list = list(query_tokenized['input_ids'].tolist())[0]
 
@@ -241,14 +254,14 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                         SELECT
                             text_id,
                             sentence_id,
-                            COUNT(token) AS matching_tokens_number,
+                            COUNT(token) AS matching_tokens_count,
                             SUM(weight) AS sentence_weight
                         FROM weighted_tokens_arrow_table
                         WHERE token IN ({filtered_token_string})
                         GROUP BY
                             text_id,
                             sentence_id
-                        HAVING matching_tokens_number >= {len(filtered_token_list)}
+                        HAVING matching_tokens_count >= {len(filtered_token_list)}
                     ),
 
                     -- Text-Level Results Common Table Expression:
@@ -278,6 +291,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                                 AND slat.sentence_id = sr_cte.sentence_id
                             JOIN text_level_arrow_table tlat ON
                                 tlat.text_id = sr_cte.text_id
+                        WHERE LENGTH(slat.sentence) > 3
                         ORDER BY
                             sr_cte.text_id ASC,
                             sr_cte.sentence_id ASC
@@ -304,18 +318,25 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
         search_result = weighted_tokens_result_dataframe.to_dict('records')
 
-        # Stop measuring searching time:
-        searching_time = time.time() - searching_start_time 
+        # Stop measuring search time:
+        search_time = time.time() - search_start_time
+
+        search_info = {
+            'Embedding Time': f'{embedding_time:.3f} s',
+            'Search Time':    f'{search_time:.3f} s',
+            'Total Time':     f'{embedding_time + search_time:.3f} s',
+        }
 
     # ColBERT and Tokens search:
     if (search_type == 'CoaT - ColBERT and Tokens'):
-        # Start measuring searching time:
-        searching_start_time = time.time()
+        # Start measuring ColBERT search time:
+        colbert_search_start_time = time.time()
 
-        result_dataframes_list = []
+        text_id_combined_list = []
+        token_combined_list   = []
 
         for query_colbert_embedding in query_colbert_embeddings:
-            colbert_and_tokens_initial_dataframe = colbert_tokens_table.search(
+            colbert_dataframe = colbert_tokens_table.search(
                 query_colbert_embedding,
                 vector_column_name='colbert_embedding'
             )\
@@ -325,127 +346,118 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
                     'token'
                 ]
             )\
-            .limit(5)\
+            .limit(3)\
             .to_pandas()
 
-            text_id_unique_list = (
-                colbert_and_tokens_initial_dataframe['text_id'].unique().tolist()
-            )
-            token_unique_list = (
-                colbert_and_tokens_initial_dataframe['token'].unique().tolist()
-            )
+            text_id_unique_list = (colbert_dataframe['text_id'].unique().tolist())
+            text_id_combined_list.extend(text_id_unique_list)
 
-            text_id_string = ', '.join(map(str, text_id_unique_list))
-            token_string = ', '.join(map(str, token_unique_list))
+            token_unique_list = (colbert_dataframe['token'].unique().tolist())
+            token_combined_list.extend(token_unique_list)
 
-            colbert_and_tokens_result_dataframe = duckdb.query(
-                f'''
-                    WITH
-                        -- Sentence-Level Results Common Table Expression:
-                        sentence_results_cte AS (
-                            SELECT
-                                text_id,
-                                sentence_id,
-                                SUM(weight) AS sentence_weight
-                            FROM weighted_tokens_arrow_table
-                            WHERE
-                                text_id IN ({text_id_string})
-                                AND token IN ({token_string})
-                            GROUP BY
-                                text_id,
-                                sentence_id
-                        ),
+        # Stop measuring ColBERT search time:
+        colbert_search_time = time.time() - colbert_search_start_time
 
-                        -- Text-Level Results Common Table Expression:
-                        text_results_cte AS (
-                            SELECT
-                                text_id,
-                                SUM(sentence_weight) AS text_weight
-                            FROM sentence_results_cte
-                            GROUP BY text_id
-                        ),
+        # Start measuring token search time:
+        token_search_start_time = time.time()
 
-                        -- Combined Results Common Table Expression:
-                        combined_results_cte AS (
-                            SELECT
-                                CAST(tr_cte.text_weight AS INT) AS text_weight,
-                                tlat.text_id,
-                                tlat.date,
-                                tlat.title,
-                                sr_cte.sentence_id,
-                                slat.sentence
-                            FROM
-                                sentence_results_cte sr_cte
-                                JOIN text_results_cte tr_cte ON
-                                    tr_cte.text_id = sr_cte.text_id
-                                JOIN sentence_level_arrow_table slat ON
-                                    slat.text_id = sr_cte.text_id
-                                    AND slat.sentence_id = sr_cte.sentence_id
-                                JOIN text_level_arrow_table tlat ON
-                                    tlat.text_id = sr_cte.text_id
-                            ORDER BY
-                                sr_cte.text_id ASC,
-                                sr_cte.sentence_id ASC
-                        )
+        text_id_string = ', '.join(map(str, text_id_combined_list))
+        token_string   = ', '.join(map(str, token_combined_list))
 
-                    -- User-facing query:
-                    SELECT
-                        text_weight,
-                        text_id,
-                        date,
-                        title,
-                        string_agg(sentence_id, ', ') AS sentence_ids,
-                        string_agg(sentence, ' -- ') AS sentences
-                    FROM combined_results_cte
-                    GROUP BY
-                        text_weight,
-                        text_id,
-                        date,
-                        title
-                    ORDER BY text_weight DESC
-                    LIMIT 10
-                '''
-            ).fetch_arrow_table().to_pandas()
-
-            result_dataframes_list.append(colbert_and_tokens_result_dataframe)
-
-        combined_dataframe = None
-
-        for result_dataframe in result_dataframes_list:
-            # Only for the first result_dataframe -
-            # at this point the combined_dataframe is still empty:
-            if combined_dataframe is None:
-                combined_dataframe = result_dataframe
-
-            # For any other dataframe after
-            # the first result_dataframe:
-            if combined_dataframe is None:
-                combined_dataframe = pd.concat(
-                    [
-                        combined_dataframe,
-                        result_dataframe
-                    ],
-                    ignore_index=True
-                )
-    
-                combined_dataframe.reset_index()
-
-        combined_dataframe.sort_values(
-            by=['text_weight'],
-            ascending=False,
-            inplace=True
+        # Define minimal percentage of matchin tokens in every sentence:
+        minimum_matching_tokens = (
+            int((50 * len(token_combined_list)) / 100.0)
         )
 
-        search_result = combined_dataframe.to_dict('records')
+        colbert_and_tokens_result_dataframe = duckdb.query(
+            f'''
+                WITH
+                    -- Sentence-Level Results Common Table Expression:
+                    sentence_results_cte AS (
+                        SELECT
+                            text_id,
+                            sentence_id,
+                            COUNT(token) AS matching_tokens_count,
+                            SUM(weight) AS sentence_weight
+                        FROM weighted_tokens_arrow_table
+                        WHERE
+                            text_id IN ({text_id_string})
+                            AND token IN ({token_string})
+                        GROUP BY
+                            text_id,
+                            sentence_id
+                        HAVING matching_tokens_count >= {minimum_matching_tokens}
+                    ),
 
-        # Stop measuring searching time:
-        searching_time = time.time() - searching_start_time 
+                    -- Text-Level Results Common Table Expression:
+                    text_results_cte AS (
+                        SELECT
+                            text_id,
+                            SUM(sentence_weight) AS text_weight
+                        FROM sentence_results_cte
+                        GROUP BY text_id
+                    ),
 
-    search_info = {
-        "Embedding Time": f"{embedding_time:.3f} s",
-        "Searching Time": f"{searching_time:.3f} s",
-        "Total Time":     f"{embedding_time + searching_time:.3f} s",
-    }
+                    -- Combined Results Common Table Expression:
+                    combined_results_cte AS (
+                        SELECT
+                            CAST(tr_cte.text_weight AS INT) AS text_weight,
+                            tlat.text_id,
+                            tlat.date,
+                            tlat.title,
+                            sr_cte.sentence_id,
+                            slat.sentence
+                        FROM
+                            sentence_results_cte sr_cte
+                            JOIN text_results_cte tr_cte ON
+                                tr_cte.text_id = sr_cte.text_id
+                            JOIN sentence_level_arrow_table slat ON
+                                slat.text_id = sr_cte.text_id
+                                AND slat.sentence_id = sr_cte.sentence_id
+                            JOIN text_level_arrow_table tlat ON
+                                tlat.text_id = sr_cte.text_id
+                        WHERE LENGTH(slat.sentence) > 3
+                        ORDER BY
+                            sr_cte.text_id ASC,
+                            sr_cte.sentence_id ASC
+                    )
+
+                -- User-facing query:
+                SELECT
+                    text_weight,
+                    text_id,
+                    date,
+                    title,
+                    string_agg(sentence_id, ', ') AS sentence_ids,
+                    string_agg(sentence, ' -- ') AS sentences
+                FROM combined_results_cte
+                GROUP BY
+                    text_weight,
+                    text_id,
+                    date,
+                    title
+                ORDER BY text_weight DESC
+                LIMIT 10
+            '''
+        ).fetch_arrow_table().to_pandas()
+
+        search_result = colbert_and_tokens_result_dataframe.to_dict('records')
+
+        # Stop measuring token search time:
+        token_search_time = time.time() - token_search_start_time
+
+        total_time = (
+            embedding_time +
+            colbert_search_time +
+            token_search_time
+        )
+
+        search_info = {
+            'Embedding Time':      f'{embedding_time:.3f} s',
+            'ColBERT Search Time': f'{colbert_search_time:.3f} s',
+            'Token Search Time':   f'{token_search_time:.3f} s',
+            'Total Time':          f'{total_time:.3f} s',
+        }
 
     return search_info, search_result
 
@@ -546,12 +558,12 @@ def main():
 
     search_type = gr.Radio(
         [
-            'Sentence Dense Vector',
-            'Sentence ColBERT Centroid',
+            'Sentence Dense Vectors',
+            'Sentence ColBERT Centroids',
             'Weighted Tokens',
             'CoaT - ColBERT and Tokens'
         ],
-        value='Sentence Dense Vector',
+        value='Sentence Dense Vectors',
         label='Search Base',
     )
 
@@ -565,37 +577,37 @@ def main():
     with gradio_interface:
         with gr.Row():
             gr.Markdown(
-                """
+                '''
                 # Fupi
                 ## Serverless multilingual semantic search
-                """
+                '''
             )
 
         with gr.Row():
             with gr.Column(scale=30):
                 gr.Markdown(
-                    """
+                    '''
                     **License:** Apache License 2.0.  
                     **Repository:** https://github.com/ddmitov/fupi  
-                    """
+                    '''
                 )
 
             with gr.Column(scale=40):
                 gr.Markdown(
-                    """
+                    '''
                     **Dataset:** Common Crawl News - 2021 Bulgarian  
                     https://commoncrawl.org/blog/news-dataset-available  
                     https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
-                    """
+                    '''
                 )
 
             with gr.Column(scale=30):
                 gr.Markdown(
-                    """
+                    '''
                     **Model:** BGE-M3  
                     https://huggingface.co/BAAI/bge-m3  
                     https://huggingface.co/aapot/bge-m3-onnx  
-                    """
+                    '''
                 )
 
         with gr.Row():
@@ -621,7 +633,7 @@ def main():
             )
 
         with gr.Row():
-            search_button = gr.Button("Search")
+            search_button = gr.Button('Search')
 
             gr.ClearButton(
                 [

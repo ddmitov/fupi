@@ -2,7 +2,7 @@
 
 import datetime
 import logging
-import multiprocessing
+from multiprocessing import cpu_count
 import os
 import time
 
@@ -11,11 +11,11 @@ import duckdb
 from huggingface_hub import hf_hub_download
 import lancedb
 from minio import Minio
-from nltk.tokenize import sent_tokenize
 import numpy as np
 import onnxruntime as ort
 import pandas as pd
 import pyarrow as pa
+import pysbd
 from transformers import AutoTokenizer
 
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app onnx_runner python /app/m3_embedder.py
@@ -166,6 +166,7 @@ def main():
                 date_publish_final IS NOT NULL
                 AND title IS NOT NULL
                 AND maintext IS NOT NULL
+                AND title NOT LIKE '%...'
             LIMIT 5000
         '''
     ).to_arrow_table().to_pylist()
@@ -187,7 +188,7 @@ def main():
     onnxrt_options = ort.SessionOptions()
 
     onnxrt_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-    onnxrt_options.intra_op_num_threads = multiprocessing.cpu_count()
+    onnxrt_options.intra_op_num_threads = cpu_count()
 
     onnxrt_options.graph_optimization_level = (
         ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -291,6 +292,9 @@ def main():
         )
     )
 
+    # Initialize sentence segmenter:
+    segmenter = pysbd.Segmenter(language='bg', clean=False)
+
     print('')
 
     try:
@@ -316,7 +320,8 @@ def main():
 
                 item_embedding_start = time.time()
 
-                sentences = sent_tokenize(
+                # Split every text to sentences:
+                sentences = segmenter.segment(
                     str(item['title']) + '. ' + str(item['text'])
                 )
 

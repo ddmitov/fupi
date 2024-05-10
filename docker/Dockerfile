@@ -10,17 +10,14 @@ RUN pip install --no-cache \
     huggingface-hub \
     lancedb \
     minio \
-    nltk \
     onnxruntime \
     pandas \
     pyarrow \
+    pysbd \
     python-dotenv \
     sentencepiece \
     sentence-transformers \
     transformers
-
-COPY ./nltk_downloader.py /etc/nltk_downloader.py
-RUN python3 /etc/nltk_downloader.py
 
 RUN mkdir /.cache
 RUN chmod 777 /.cache
@@ -33,8 +30,6 @@ RUN chmod 777 /.config/lancedb
 
 RUN mkdir /.config/matplotlib
 RUN chmod 777 /.config/matplotlib
-
-RUN chmod 777 /usr/share/nltk_data
 
 CMD ["python"]
 

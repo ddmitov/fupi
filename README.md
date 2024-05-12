@@ -18,9 +18,8 @@ Today we use complex machine learning technologies thanks to the knowledge, pers
   no part of Fupi runs long without usage,  
   Serverless or Scale to Zero application models are selected based on the underlying infrastructure.
 * **3.** Adaptability to different cloud environments or on-premise systems
-* **4.** No dependency on AI as a service (AIaaS) for production of the embeddings
+* **4.** No dependency on AI as a service (AIaaS) for production of embeddings
 * **5.** No dependency on software as a service (SaaS) for storage of embeddings
-* **6.** No dependency on GPUs, TPUs or other specialized AI compute hardware
 
 ## [Thanks and Credits](./CREDITS.md)
 

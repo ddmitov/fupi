@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 
+import datetime
 import os
 from multiprocessing import cpu_count
+import signal
 import time
+import threading
 
 from dotenv import load_dotenv, find_dotenv
 import duckdb
+from fastapi import FastAPI
 import gradio as gr
 import lancedb
 from minio import Minio
 import numpy as np
 import onnxruntime as ort
 from transformers import AutoTokenizer
+import uvicorn
 
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_runner python /app/m3_searcher.py
 # http://0.0.0.0:7860/?__theme=dark
@@ -32,7 +37,7 @@ sentence_level_arrow_table  = None
 text_level_arrow_table      = None
 weighted_tokens_arrow_table = None
 
-gradio_interface = None
+last_activity = None
 
 
 def centroid_maker(embeddings_list: np.ndarray) -> list:
@@ -42,6 +47,10 @@ def centroid_maker(embeddings_list: np.ndarray) -> list:
 
 
 def lancedb_searcher(search_request: str, search_type: str)-> object:
+    # Update last activity date and time:
+    global last_activity
+    last_activity = time.time()
+
     # Use the already initialized ONNX runtime and tokenizer:
     global onnx_runtime_session
     global tokenizer
@@ -486,6 +495,26 @@ def s3_downloader(bucket_name, bucket_prefix):
     return True
 
 
+def activity_inspector():
+    global last_activity
+
+    thread = threading.Timer(
+        int(os.environ['PERIODIC_CHECK_SECONDS']),
+        activity_inspector
+    )
+
+    thread.daemon = True
+
+    thread.start()
+
+    if time.time() - last_activity > int(os.environ['MAXIMAL_INACTIVITY_SECONDS']):
+        print(f'Initiating shutdown sequence at: {datetime.datetime.now()}')
+
+        os.kill(os.getpid(), signal.SIGINT)
+    else:
+        print(f'Activity check at: {datetime.datetime.now()}')
+
+
 def main():
     print('')
     print('Downloading the embedding model from object storage ...')
@@ -663,14 +692,37 @@ def main():
             ],
         )
 
-    gradio_interface.launch(
-        server_name='0.0.0.0',
-        # server_port=8080,
-        share=False,
-        show_api=False,
-        inline=False,
-        inbrowser=False
+    gradio_interface.show_api = False
+    gradio_interface.queue()
+
+    fastapi_app = FastAPI()
+
+    fastapi_app = gr.mount_gradio_app(
+        fastapi_app,
+        gradio_interface,
+        path='/'
     )
+
+    # Update last activity date and time:
+    global last_activity
+    last_activity = time.time()
+
+    # Start activity inspector in a separate thread
+    # to implement slale-to-zero capability, i.e.
+    # when there is no user activity for a predefined amount of time
+    # the application will shut down.
+    activity_inspector()
+
+    try:
+        uvicorn.run(
+            fastapi_app,
+            host='0.0.0.0',
+            port=7860
+        )
+    except (KeyboardInterrupt, SystemExit):
+        print('\n')
+
+        exit(0)
 
 
 if __name__ == '__main__':

@@ -13,10 +13,7 @@ Today we use complex machine learning technologies thanks to the knowledge, pers
 
 * **1.** Multilingual (Cross-Language) Semantic Search:  
   ability to search using one language in texts of another language
-* **2.** Serverless or Scale to Zero application models for low operational costs:  
-  no part of Fupi runs constantly,  
-  no part of Fupi runs long without usage,  
-  Serverless or Scale to Zero application models are selected based on the underlying infrastructure.
+* **2.** Usability in serverless or scale-to-zero applications for low operational costs
 * **3.** Adaptability to different cloud environments or on-premise systems
 * **4.** No dependency on AI as a service (AIaaS) for production of embeddings
 * **5.** No dependency on software as a service (SaaS) for storage of embeddings

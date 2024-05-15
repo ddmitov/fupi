@@ -578,8 +578,8 @@ def main():
         with gr.Row():
             gr.Markdown(
                 '''
-                # Fupi
-                ## Serverless multilingual semantic search
+                # Fupi Demo
+                ## Multilingual Semantic Search
                 '''
             )
 
@@ -622,8 +622,6 @@ def main():
                     'COVID',
                     'pandemic recovery',
                     'European union',
-                    'Plovdiv',
-                    'local budget',
                     'environmental impact',
                 ],
                 fn=lancedb_searcher,

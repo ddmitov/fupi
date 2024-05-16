@@ -5,7 +5,7 @@ import os
 
 import lancedb
 
-# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_runner python /app/lancedb_compactor.py
+# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/lancedb_compactor.py
 
 load_dotenv(find_dotenv())
 

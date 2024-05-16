@@ -18,7 +18,7 @@ import pyarrow as pa
 import pysbd
 from transformers import AutoTokenizer
 
-# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app onnx_runner python /app/m3_embedder.py
+# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app fupi python /app/m3_embedder.py
 
 # Load settings from .env file:
 load_dotenv(find_dotenv())

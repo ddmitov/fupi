@@ -18,7 +18,7 @@ import onnxruntime as ort
 from transformers import AutoTokenizer
 import uvicorn
 
-# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 onnx_runner python /app/m3_searcher.py
+# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/m3_searcher.py
 # http://0.0.0.0:7860/?__theme=dark
 
 # Load settings from .env file:

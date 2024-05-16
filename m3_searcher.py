@@ -516,22 +516,17 @@ def activity_inspector():
 
 
 def main():
+    embedding_model_loading_start = time.time()
+
     print('')
     print('Downloading the embedding model from object storage ...')
     print('')
 
     s3_downloader(os.environ['LANCEDB_BUCKET_NAME'], 'model')
 
-    print('')
-    print('The embedding model is downloaded.')
-    print('')
-
     # MinIO local object storage settings:
     os.environ['AWS_ENDPOINT'] = f'http://{os.environ['S3_ENDPOINT']}'
     os.environ['ALLOW_HTTP'] = 'True'
-
-    # Disable Gradio telemetry:
-    os.environ['GRADIO_ANALYTICS_ENABLED'] = 'False'
 
     # Set ONNX runtime session configuration:
     onnxrt_options = ort.SessionOptions()
@@ -554,6 +549,15 @@ def main():
         sess_ptions=onnxrt_options,
         providers=['CPUExecutionProvider']
     )
+
+    embedding_model_loading_time = round(
+        (time.time() - embedding_model_loading_start),
+        2
+    )
+
+    print('')
+    print(f'Embedding model was loaded for {embedding_model_loading_time} seconds.')
+    print('')
 
     # Initialize tokenizer:
     global tokenizer
@@ -581,6 +585,9 @@ def main():
     sentence_level_arrow_table  = sentence_level_table.to_lance()
     text_level_arrow_table      = text_level_table.to_lance()
     weighted_tokens_arrow_table = weighted_tokens_table.to_lance()
+
+    # Disable Gradio telemetry:
+    os.environ['GRADIO_ANALYTICS_ENABLED'] = 'False'
 
     # Define Gradio user interface:
     search_request_box=gr.Textbox(lines=1, label='Search Request')

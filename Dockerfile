@@ -38,6 +38,14 @@ RUN chmod 777 /.config/lancedb
 RUN mkdir /.config/matplotlib
 RUN chmod 777 /.config/matplotlib
 
-CMD ["python"]
+RUN mkdir /home/fupi
+
+COPY ./.env /home/fupi/.env
+COPY ./fupi_searcher.py /home/fupi/fupi_searcher.py
+
+# Start Fupi Gradio demo application by default:
+EXPOSE 7860
+CMD ["python", "/home/fupi/fupi_searcher.py"]
 
 # docker build -t fupi .
+# docker buildx build -t fupi .

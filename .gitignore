@@ -1,6 +1,7 @@
+__pycache__
 data
 
 .env
-
 backup
+mc
 upgit

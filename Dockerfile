@@ -41,11 +41,11 @@ RUN chmod 777 /.config/matplotlib
 RUN mkdir /home/fupi
 
 COPY ./.env /home/fupi/.env
-COPY ./fupi_searcher.py /home/fupi/fupi_searcher.py
+COPY ./searcher.py /home/fupi/searcher.py
 
 # Start Fupi Gradio demo application by default:
 EXPOSE 7860
-CMD ["python", "/home/fupi/fupi_searcher.py"]
+CMD ["python", "/home/fupi/searcher.py"]
 
 # docker build -t fupi .
 # docker buildx build -t fupi .

@@ -14,7 +14,6 @@ import onnxruntime as ort
 from transformers import AutoTokenizer
 import uvicorn
 
-from fupi import model_downloader_from_object_storage
 from fupi import ort_session_starter
 from fupi import fupi_dense_vectors_searcher
 from fupi import fupi_colbert_centroids_searcher
@@ -145,19 +144,6 @@ def activity_inspector():
 def main():
     embedding_model_loading_start = time.time()
 
-    print('')
-    print('Downloading the embedding model from object storage ...')
-    print('')
-
-    model_downloader_from_object_storage(os.environ['MINIO_BUCKET_NAME'], 'model')
-
-    # LanceDB object storage settings:
-    os.environ['AWS_ENDPOINT'] = f'http://{os.environ['MINIO_ENDPOINT_S3']}'
-    os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
-    os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
-    os.environ['AWS_REGION'] = 'us-east-1'
-    os.environ['ALLOW_HTTP'] = 'True'
-
     # Initialize ONNX runtime session:
     global onnx_runtime_session
     onnx_runtime_session = ort_session_starter()
@@ -176,6 +162,13 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         '/tmp/model/'
     )
+
+    # LanceDB object storage settings:
+    os.environ['AWS_ENDPOINT'] = f'http://{os.environ['MINIO_ENDPOINT_S3']}'
+    os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
+    os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
+    os.environ['AWS_REGION'] = 'us-east-1'
+    os.environ['ALLOW_HTTP'] = 'True'
 
     # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{os.environ['MINIO_BUCKET_NAME']}/')

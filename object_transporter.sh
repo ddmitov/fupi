@@ -11,7 +11,7 @@ fi
 ./mc --config-dir ./mc_cfg alias set minio http://0.0.0.0:9000 $MINIO_ACCESS_KEY_ID $MINIO_SECRET_ACCESS_KEY
 ./mc --config-dir ./mc_cfg alias set tigris $TIGRIS_ENDPOINT_S3 $TIGRIS_ACCESS_KEY_ID $TIGRIS_SECRET_ACCESS_KEY
 
-./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_BUCKET_NAME/sentence-level.lance tigris/$TIGRIS_BUCKET_NAME/sentence-level.lance
-./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_BUCKET_NAME/text-level.lance tigris/$TIGRIS_BUCKET_NAME/text-level.lance
+./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_BUCKET_NAME/sentence-level.lance tigris/$TIGRIS_BUCKET_NAME
+./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_BUCKET_NAME/text-level.lance tigris/$TIGRIS_BUCKET_NAME
 
 rm -rf ./mc_cfg

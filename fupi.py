@@ -4,12 +4,31 @@ from multiprocessing import cpu_count
 import os
 
 import duckdb
+from huggingface_hub import hf_hub_download
 import lancedb
 from minio import Minio
 import numpy as np
 import onnxruntime as ort
 import pandas as pd
 import pyarrow as pa
+
+
+def model_downloader_from_hugging_face() -> True:
+    hf_hub_download(
+        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
+        filename='model.onnx',
+        local_dir='/tmp/model',
+        repo_type='model'
+    )
+
+    hf_hub_download(
+        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
+        filename='model.onnx_data',
+        local_dir='/tmp/model',
+        repo_type='model'
+    )
+
+    return True
 
 
 def model_downloader_from_object_storage(
@@ -41,8 +60,10 @@ def model_downloader_from_object_storage(
     return True
 
 
-def lancedb_tables_creator():
-    lance_db = lancedb.connect(f's3://{os.environ['MINIO_BUCKET_NAME']}/')
+def lancedb_tables_creator(
+    lancedb_bucket_name: str
+) -> tuple[lancedb.table.Table, lancedb.table.Table]:
+    lance_db = lancedb.connect(f's3://{lancedb_bucket_name}/')
 
     text_level_table_schema = pa.schema(
         [
@@ -80,7 +101,7 @@ def lancedb_tables_creator():
     return text_level_table, sentence_level_table
 
 
-def ort_session_starter():
+def ort_session_starter() -> ort.InferenceSession:
     # Set ONNX runtime session configuration:
     onnxrt_options = ort.SessionOptions()
 
@@ -119,7 +140,10 @@ def centroid_maker_for_series(group: pd.Series) -> list:
     return average_embedding_list
 
 
-def fupi_dense_vectors_searcher(sentence_level_table, query_dense_embedding):
+def fupi_dense_vectors_searcher(
+    sentence_level_table: lancedb.table.Table,
+    query_dense_embedding: np.ndarray
+) -> pd.DataFrame:
     dense_initial_dataframe = sentence_level_table.search(
         query_dense_embedding.tolist(),
         vector_column_name='dense_embedding'
@@ -178,7 +202,10 @@ def fupi_dense_vectors_searcher(sentence_level_table, query_dense_embedding):
     return search_result
 
 
-def fupi_colbert_centroids_searcher(sentence_level_table, query_colbert_embeddings):
+def fupi_colbert_centroids_searcher(
+    sentence_level_table: lancedb.table.Table,
+    query_colbert_embeddings: np.ndarray
+) -> pd.DataFrame:
     query_colbert_centroid = centroid_maker_for_arrays(query_colbert_embeddings)
 
     colbert_initial_dataframe = sentence_level_table.search(

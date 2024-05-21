@@ -13,7 +13,7 @@ import pandas as pd
 import pysbd
 from transformers import AutoTokenizer
 
-from fupi import model_downloader_from_object_storage
+# from fupi import model_downloader_from_hugging_face
 from fupi import ort_session_starter
 from fupi import lancedb_tables_creator
 from fupi import centroid_maker_for_arrays
@@ -25,10 +25,11 @@ from fupi import centroid_maker_for_series
 load_dotenv(find_dotenv())
 
 # LanceDB object storage settings:
-os.environ['AWS_ENDPOINT'] = f'http://{os.environ['MINIO_ENDPOINT_S3']}'
+os.environ['AWS_ENDPOINT'] = os.environ['MINIO_ENDPOINT_S3']
 os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
 os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
 os.environ['AWS_REGION'] = 'us-east-1'
+
 os.environ['ALLOW_HTTP'] = 'True'
 
 # Input data settings:
@@ -42,24 +43,6 @@ def batch_generator(item_list, items_per_batch):
 
 def newlines_remover(text: str) -> str:
     return text.replace('\n', ' ')
-
-
-def hugging_face_model_downloader() -> True:
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx',
-        local_dir='/tmp/model',
-        repo_type='model'
-    )
-
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx_data',
-        local_dir='/tmp/model',
-        repo_type='model'
-    )
-
-    return True
 
 
 def logger_starter():
@@ -118,28 +101,21 @@ def main():
         '''
     ).to_arrow_table().to_pylist()
 
-    # Download the embedding model:
-    print('')
-    print('Downloading the BGE-M3 embedding model from object storage ...')
-    print('')
-
-    model_downloader_from_object_storage('bge-m3', 'model')
-
     # print('')
     # print('Downloading the BGE-M3 embedding model from Hugging Face ...')
     # print('')
 
-    # hugging_face_model_downloader()
+    # model_downloader_from_hugging_face()
 
     ort_session = ort_session_starter()
 
     # Initialize tokenizer:
-    tokenizer = AutoTokenizer.from_pretrained(
-        '/tmp/model/'
-    )
+    tokenizer = AutoTokenizer.from_pretrained('/tmp/model/')
 
     # Create LanceDB tables:
-    text_level_table, sentence_level_table = lancedb_tables_creator()
+    text_level_table, sentence_level_table = (
+        lancedb_tables_creator(os.environ['MINIO_BUCKET_NAME'])
+    )
 
     # Get input data: 
     batch_list = list(

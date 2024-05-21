@@ -2,6 +2,7 @@
 
 import datetime
 import os
+import resource
 import signal
 import time
 import threading
@@ -21,14 +22,8 @@ from fupi import fupi_colbert_centroids_searcher
 # Start the application for local development:
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/searcher.py
 
-# Start the containerized application:
-# docker run --rm -it -p 7860:7860 fupi
-
-# Use the dark theme:
+# Use the dark theme in local development:
 # http://0.0.0.0:7860/?__theme=dark
-
-# Load settings from .env file:
-load_dotenv(find_dotenv())
 
 # Global variables:
 onnx_runtime_session = None
@@ -118,6 +113,15 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
             'Total Time':     f'{embedding_time + search_time:.3f} s',
         }
 
+    memory_usage_megabytes = round(
+        (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024),
+        2
+    )
+
+    memory_usage_gigabytes = round((memory_usage_megabytes / 1024), 2)
+
+    print(f'Maximal RSS memory usage: {memory_usage_gigabytes} GB')
+
     return search_info, search_result
 
 
@@ -163,15 +167,30 @@ def main():
         '/tmp/model/'
     )
 
-    # LanceDB object storage settings:
-    os.environ['AWS_ENDPOINT'] = f'http://{os.environ['MINIO_ENDPOINT_S3']}'
-    os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
-    os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
-    os.environ['AWS_REGION'] = 'us-east-1'
-    os.environ['ALLOW_HTTP'] = 'True'
+    # Load LanceDB object storage settings from .env file:
+    load_dotenv(find_dotenv())
+
+    # LanceDB settings for Fly.io - Tigris deployment:
+    if os.environ.get('FLY_APP_NAME') is not None:
+        os.environ['AWS_ENDPOINT'] = os.environ['TIGRIS_ENDPOINT_S3']
+        os.environ['AWS_ACCESS_KEY_ID'] = os.environ['TIGRIS_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['TIGRIS_SECRET_ACCESS_KEY']
+        os.environ['AWS_REGION'] = 'auto'
+
+        lancedb_bucket_name = os.environ['TIGRIS_BUCKET_NAME']
+    # LanceDB settings for local development:
+    else:
+        os.environ['AWS_ENDPOINT'] = os.environ['MINIO_ENDPOINT_S3']
+        os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
+        os.environ['AWS_REGION'] = 'us-east-1'
+
+        os.environ['ALLOW_HTTP'] = 'True'
+
+        lancedb_bucket_name = os.environ['MINIO_BUCKET_NAME']
 
     # Define LanceDB tables:
-    lance_db = lancedb.connect(f's3://{os.environ['MINIO_BUCKET_NAME']}/')
+    lance_db = lancedb.connect(f's3://{lancedb_bucket_name}/')
 
     global sentence_level_table
     global text_level_table
@@ -291,6 +310,9 @@ def main():
 
     gradio_interface.show_api = False
     gradio_interface.queue()
+
+    if os.environ.get('FLY_APP_NAME') is not None:
+        gradio_interface.root_path = 'https://fupi.fly.dev'
 
     fastapi_app = FastAPI()
 

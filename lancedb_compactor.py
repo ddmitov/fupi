@@ -10,7 +10,7 @@ import lancedb
 load_dotenv(find_dotenv())
 
 # LanceDB object storage settings:
-os.environ['AWS_ENDPOINT'] = f'http://{os.environ['MINIO_ENDPOINT_S3']}'
+os.environ['AWS_ENDPOINT'] = os.environ['MINIO_ENDPOINT_S3']
 os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
 os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
 os.environ['AWS_REGION'] = 'us-east-1'

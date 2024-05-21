@@ -1,0 +1,11 @@
+**/__pycache__
+**/assets
+**/data
+**/mc_cfg
+
+**/backup
+**/mc
+**/upgit
+**/**.md
+**/**.sh
+fly.toml

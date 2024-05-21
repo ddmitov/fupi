@@ -1,8 +1,0 @@
-#!/usr/bin/bash
-
-source .env
-
-fly secrets set TIGRIS_ENDPOINT_S3=$TIGRIS_ENDPOINT_S3
-fly secrets set TIGRIS_ACCESS_KEY_ID=$TIGRIS_ACCESS_KEY_ID
-fly secrets set TIGRIS_SECRET_ACCESS_KEY=$TIGRIS_SECRET_ACCESS_KEY
-fly secrets set TIGRIS_BUCKET_NAME=$TIGRIS_BUCKET_NAME

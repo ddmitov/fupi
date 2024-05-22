@@ -32,10 +32,21 @@ text_level_table     = None
 last_activity = None
 
 
-def lancedb_searcher(search_request: str, search_type: str)-> object:
+def lancedb_searcher(
+    search_request: str,
+    search_type: str
+)-> tuple[dict, dict]:
     # Update last activity date and time:
     global last_activity
     last_activity = time.time()
+
+    if len(search_request) == 0:
+        message = 'Please, enter a search request or use one of the examples!'
+
+        gr.Info(message)
+        message_dict = {'message': message}
+
+        return message_dict, message_dict
 
     # Use the already initialized ONNX runtime and tokenizer:
     global onnx_runtime_session
@@ -43,9 +54,8 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
 
     # If the ONNX runtime session or the tokenizer are still not initialized,
     # wait for one second and try again:
-    if onnx_runtime_session is None or tokenizer is None:
+    while onnx_runtime_session is None or tokenizer is None:
         time.sleep(1)
-        lancedb_searcher(search_request, search_type)
 
     # LanceDB tables:
     global sentence_level_table
@@ -128,7 +138,7 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     return search_info, search_result
 
 
-def activity_inspector():
+def activity_inspector() -> True:
     global last_activity
 
     thread = threading.Timer(
@@ -151,7 +161,7 @@ def activity_inspector():
 def embedding_model_threaded_starter(
     models_bucket_name: str,
     models_bucket_prefix: str
-):
+) -> True:
     # Download embedding model and tokenizer from object storage:
     model_downloader_from_object_storage(
         models_bucket_name,
@@ -300,7 +310,7 @@ def main():
                 )
 
         with gr.Row():
-                search_type.render()
+            search_type.render()
 
         with gr.Row():
             search_request_box.render()

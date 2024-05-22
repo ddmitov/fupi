@@ -14,7 +14,7 @@ import pysbd
 from transformers import AutoTokenizer
 
 # from fupi import model_downloader_from_hugging_face
-from fupi import ort_session_starter
+from fupi import ort_session_starter_for_text_embedding
 from fupi import lancedb_tables_creator
 from fupi import centroid_maker_for_arrays
 from fupi import centroid_maker_for_series
@@ -107,14 +107,14 @@ def main():
 
     # model_downloader_from_hugging_face()
 
-    ort_session = ort_session_starter()
+    ort_session = ort_session_starter_for_text_embedding()
 
     # Initialize tokenizer:
     tokenizer = AutoTokenizer.from_pretrained('/tmp/model/')
 
     # Create LanceDB tables:
     text_level_table, sentence_level_table = (
-        lancedb_tables_creator(os.environ['MINIO_BUCKET_NAME'])
+        lancedb_tables_creator(os.environ['MINIO_LANCEDB_BUCKET'])
     )
 
     # Get input data: 
@@ -318,6 +318,16 @@ def main():
     except (KeyboardInterrupt, SystemExit):
         print('\n')
         exit(0)
+
+    # Compact all newly created LanceDB tables:
+    print('')
+    print('Compacting LanceDB tables ...')
+
+    text_level_table.compact_files()
+    sentence_level_table.compact_files()
+
+    print('All LanceDB tables are compacted.')
+    print('')
 
 
 if __name__ == '__main__':

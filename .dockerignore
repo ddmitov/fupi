@@ -6,6 +6,6 @@
 **/backup
 **/mc
 **/upgit
-**/**.md
-**/**.sh
+**/*.md
+**/*.sh
 fly.toml

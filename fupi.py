@@ -35,11 +35,21 @@ def model_downloader_from_object_storage(
     bucket_name: str,
     bucket_prefix: str
 ) -> True:
+    minio_endpoint = str(os.environ['AWS_ENDPOINT'])
+    secure_mode = None
+
+    if 'https' in minio_endpoint:
+        minio_endpoint = minio_endpoint.replace('https://', '')
+        secure_mode = True
+    else:
+        minio_endpoint = minio_endpoint.replace('http://', '')
+        secure_mode = False
+
     client = Minio(
-        os.environ['MINIO_ENDPOINT_S3'],
-        access_key=os.environ['MINIO_ACCESS_KEY_ID'],
-        secret_key=os.environ['MINIO_SECRET_ACCESS_KEY'],
-        secure=False
+        minio_endpoint,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=secure_mode
     )
 
     for item in client.list_objects(
@@ -47,15 +57,12 @@ def model_downloader_from_object_storage(
         prefix=bucket_prefix,
         recursive=True
     ):
-        print(item.object_name)
 
         client.fget_object(
             bucket_name,
             item.object_name,
             '/tmp/' + item.object_name
         )
-
-    print('')
 
     return True
 
@@ -101,7 +108,7 @@ def lancedb_tables_creator(
     return text_level_table, sentence_level_table
 
 
-def ort_session_starter() -> ort.InferenceSession:
+def ort_session_starter_for_text_embedding() -> ort.InferenceSession:
     # Set ONNX runtime session configuration:
     onnxrt_options = ort.SessionOptions()
 

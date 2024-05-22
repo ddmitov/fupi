@@ -34,12 +34,6 @@ RUN chmod 777 /.config
 RUN mkdir /.config/lancedb
 RUN chmod 777 /.config/lancedb
 
-# Embedding model is included in the Docker image
-# to increase the startup time of the Fupi Gradio search application:
-COPY ./m3_downloader.py /etc/m3_downloader.py
-RUN mkdir /tmp/model
-RUN python3 /etc/m3_downloader.py
-
 # Fupi Gradio search application settings:
 RUN mkdir /.config/matplotlib
 RUN chmod 777 /.config/matplotlib

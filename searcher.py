@@ -15,15 +15,12 @@ import onnxruntime as ort
 from transformers import AutoTokenizer
 import uvicorn
 
-from fupi import ort_session_starter
+from fupi import model_downloader_from_object_storage
 from fupi import fupi_dense_vectors_searcher
 from fupi import fupi_colbert_centroids_searcher
 
-# Start the application for local development:
+# Start the application for local development at http://0.0.0.0:7860/ using:
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/searcher.py
-
-# Use the dark theme in local development:
-# http://0.0.0.0:7860/?__theme=dark
 
 # Global variables:
 onnx_runtime_session = None
@@ -44,13 +41,19 @@ def lancedb_searcher(search_request: str, search_type: str)-> object:
     global onnx_runtime_session
     global tokenizer
 
+    # If the ONNX runtime session or the tokenizer are still not initialized,
+    # wait for one second and try again:
+    if onnx_runtime_session is None or tokenizer is None:
+        time.sleep(1)
+        lancedb_searcher(search_request, search_type)
+
     # LanceDB tables:
     global sentence_level_table
     global text_level_table
 
     # LanceDB tables exposed as Arrow tables:
-    sentence_level_arrow_table  = sentence_level_table.to_lance()
-    text_level_arrow_table      = text_level_table.to_lance()
+    sentence_level_arrow_table = sentence_level_table.to_lance()
+    text_level_arrow_table     = text_level_table.to_lance()
 
     # Start measuring tokenization and embedding time:
     embedding_start_time = time.time()
@@ -137,48 +140,59 @@ def activity_inspector():
 
     thread.start()
 
-    if time.time() - last_activity > int(os.environ['INACTIVITY_MAXIMUM_SECONDS']):
+    if (time.time() - last_activity) > int(os.environ['INACTIVITY_MAXIMUM_SECONDS']):
         print(f'Initiating shutdown sequence at: {datetime.datetime.now()}')
 
         os.kill(os.getpid(), signal.SIGINT)
-    # else:
-    #     print(f'Activity check at: {datetime.datetime.now()}')
+
+    return True
 
 
-def main():
-    embedding_model_loading_start = time.time()
+def embedding_model_threaded_starter(
+    models_bucket_name: str,
+    models_bucket_prefix: str
+):
+    # Download embedding model and tokenizer from object storage:
+    model_downloader_from_object_storage(
+        models_bucket_name,
+        models_bucket_prefix
+    )
 
     # Initialize ONNX runtime session:
     global onnx_runtime_session
-    onnx_runtime_session = ort_session_starter()
 
-    embedding_model_loading_time = round(
-        (time.time() - embedding_model_loading_start),
-        2
+    onnx_runtime_session = ort.InferenceSession(
+        '/tmp/bge-m3/model.onnx',
+        providers=['CPUExecutionProvider']
     )
-
-    print('')
-    print(f'Embedding model was loaded for {embedding_model_loading_time} seconds.')
-    print('')
 
     # Initialize tokenizer:
     global tokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(
-        '/tmp/model/'
+        '/tmp/bge-m3/'
     )
 
-    # Load LanceDB object storage settings from .env file:
+    return True
+
+
+def main():
+    # Load object storage settings from .env file:
     load_dotenv(find_dotenv())
 
-    # LanceDB settings for Fly.io - Tigris deployment:
+    lancedb_bucket_name = None
+    models_bucket_name = None
+
+    # Object storage settings for Fly.io - Tigris deployment:
     if os.environ.get('FLY_APP_NAME') is not None:
         os.environ['AWS_ENDPOINT'] = os.environ['TIGRIS_ENDPOINT_S3']
         os.environ['AWS_ACCESS_KEY_ID'] = os.environ['TIGRIS_ACCESS_KEY_ID']
         os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['TIGRIS_SECRET_ACCESS_KEY']
         os.environ['AWS_REGION'] = 'auto'
 
-        lancedb_bucket_name = os.environ['TIGRIS_BUCKET_NAME']
-    # LanceDB settings for local development:
+        lancedb_bucket_name = os.environ['TIGRIS_LANCEDB_BUCKET']
+        models_bucket_name = os.environ['TIGRIS_MODELS_BUCKET']
+    # Object storage settings for local development:
     else:
         os.environ['AWS_ENDPOINT'] = os.environ['MINIO_ENDPOINT_S3']
         os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
@@ -187,7 +201,20 @@ def main():
 
         os.environ['ALLOW_HTTP'] = 'True'
 
-        lancedb_bucket_name = os.environ['MINIO_BUCKET_NAME']
+        lancedb_bucket_name = os.environ['MINIO_LANCEDB_BUCKET']
+        models_bucket_name = os.environ['MINIO_MODELS_BUCKET']
+
+    # The embedding model and the tokenizer are downloaded and initialized
+    # in a separate thread to minimize the startup time of the application:
+    embedding_model_starter_thread = threading.Thread(
+        target=embedding_model_threaded_starter,
+        args=[
+            models_bucket_name,
+            'bge-m3'
+        ]
+    )
+
+    embedding_model_starter_thread.start()
 
     # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{lancedb_bucket_name}/')
@@ -217,8 +244,23 @@ def main():
 
     search_results_box=gr.JSON(label='Search Results', show_label=True)
 
-    global gradio_interface
-    gradio_interface = gr.Blocks(theme=gr.themes.Glass(), title='Fupi')
+    # Dark theme by default:
+    js_function = """
+        function refresh() {
+            const url = new URL(window.location);
+
+            if (url.searchParams.get('__theme') !== 'dark') {
+                url.searchParams.set('__theme', 'dark');
+                window.location.href = url.href;
+            }
+        }
+    """
+
+    gradio_interface = gr.Blocks(
+        theme=gr.themes.Glass(),
+        js=js_function,
+        title='Fupi'
+    )
 
     with gradio_interface:
         with gr.Row():
@@ -234,7 +276,8 @@ def main():
                 gr.Markdown(
                     '''
                     **License:** Apache License 2.0.  
-                    **Repository:** https://github.com/ddmitov/fupi  
+                    **https://github.com/ddmitov/fupi**  
+                    **https://fupi.fly.dev**  
                     '''
                 )
 
@@ -242,8 +285,8 @@ def main():
                 gr.Markdown(
                     '''
                     **Dataset:** Common Crawl News - 2021 Bulgarian  
-                    https://commoncrawl.org/blog/news-dataset-available  
-                    https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
+                    **https://commoncrawl.org/blog/news-dataset-available**  
+                    **https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual**  
                     '''
                 )
 
@@ -251,8 +294,8 @@ def main():
                 gr.Markdown(
                     '''
                     **Model:** BGE-M3  
-                    https://huggingface.co/BAAI/bge-m3  
-                    https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx  
+                    **https://huggingface.co/BAAI/bge-m3**  
+                    **https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx**  
                     '''
                 )
 

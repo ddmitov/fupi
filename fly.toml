@@ -15,7 +15,12 @@ primary_region = 'ams'
     soft_limit = 200
     hard_limit = 250
 
-[[vm]]
+[vm]
   memory = '4gb'
   cpu_kind = 'performance'
   cpus = 2
+
+[mounts]
+  source = "fupi_data"
+  destination = "/tmp"
+  initial_size = "10GB"

@@ -23,6 +23,8 @@ from fupi import fupi_colbert_centroids_searcher
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/searcher.py
 
 # Global variables:
+models_bucket_name   = None
+
 onnx_runtime_session = None
 tokenizer            = None
 
@@ -52,11 +54,6 @@ def lancedb_searcher(
     global onnx_runtime_session
     global tokenizer
 
-    # If the ONNX runtime session or the tokenizer are still not initialized,
-    # wait for one second and try again:
-    while onnx_runtime_session is None or tokenizer is None:
-        time.sleep(1)
-
     # LanceDB tables:
     global sentence_level_table
     global text_level_table
@@ -64,6 +61,9 @@ def lancedb_searcher(
     # LanceDB tables exposed as Arrow tables:
     sentence_level_arrow_table = sentence_level_table.to_lance()
     text_level_arrow_table     = text_level_table.to_lance()
+
+    if onnx_runtime_session is None or tokenizer is None:
+        embedding_model_starter()
 
     # Start measuring tokenization and embedding time:
     embedding_start_time = time.time()
@@ -92,7 +92,7 @@ def lancedb_searcher(
     if (search_type == 'Sentence Dense Vectors'):
         search_start_time = time.time()
 
-        query_dense_embedding    = query_embedded[0][0]
+        query_dense_embedding = query_embedded[0][0]
 
         search_result = fupi_dense_vectors_searcher(
             sentence_level_table,
@@ -158,15 +158,33 @@ def activity_inspector() -> True:
     return True
 
 
-def embedding_model_threaded_starter(
-    models_bucket_name: str,
-    models_bucket_prefix: str
-) -> True:
-    # Download embedding model and tokenizer from object storage:
-    model_downloader_from_object_storage(
-        models_bucket_name,
-        models_bucket_prefix
-    )
+def embedding_model_starter() -> True:
+    # Download the embedding model if necessary:
+    embedding_model_filelist = [
+        '/tmp/bge-m3/model.onnx',
+        '/tmp/bge-m3/model.onnx_data',
+        '/tmp/bge-m3/special_tokens_map.json',
+        '/tmp/bge-m3/tokenizer_config.json',
+        '/tmp/bge-m3/tokenizer.json'
+    ]
+
+    while True:
+        inspected_filelist = []
+
+        for file in embedding_model_filelist:
+            inspected_filelist.append(os.path.isfile(file))
+
+        if all(inspected_filelist):
+            break
+        else:
+            gr.Info('Downloading embedding model. This can take a while.')
+
+            global models_bucket_name
+
+            model_downloader_from_object_storage(
+                models_bucket_name,
+                'bge-m3'
+            )
 
     # Initialize ONNX runtime session:
     global onnx_runtime_session
@@ -176,12 +194,10 @@ def embedding_model_threaded_starter(
         providers=['CPUExecutionProvider']
     )
 
-    # Initialize tokenizer:
+    # Initialize the tokenizer:
     global tokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        '/tmp/bge-m3/'
-    )
+    tokenizer = AutoTokenizer.from_pretrained('/tmp/bge-m3/')
 
     return True
 
@@ -191,7 +207,7 @@ def main():
     load_dotenv(find_dotenv())
 
     lancedb_bucket_name = None
-    models_bucket_name = None
+    global models_bucket_name
 
     # Object storage settings for Fly.io - Tigris deployment:
     if os.environ.get('FLY_APP_NAME') is not None:
@@ -214,26 +230,14 @@ def main():
         lancedb_bucket_name = os.environ['MINIO_LANCEDB_BUCKET']
         models_bucket_name = os.environ['MINIO_MODELS_BUCKET']
 
-    # The embedding model and the tokenizer are downloaded and initialized
-    # in a separate thread to minimize the startup time of the application:
-    embedding_model_starter_thread = threading.Thread(
-        target=embedding_model_threaded_starter,
-        args=[
-            models_bucket_name,
-            'bge-m3'
-        ]
-    )
-
-    embedding_model_starter_thread.start()
-
     # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{lancedb_bucket_name}/')
 
     global sentence_level_table
     global text_level_table
 
-    sentence_level_table  = lance_db.open_table('sentence-level')
-    text_level_table      = lance_db.open_table('text-level')
+    sentence_level_table = lance_db.open_table('sentence-level')
+    text_level_table     = lance_db.open_table('text-level')
 
     # Disable Gradio telemetry:
     os.environ['GRADIO_ANALYTICS_ENABLED'] = 'False'

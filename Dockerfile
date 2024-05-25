@@ -1,9 +1,7 @@
 FROM python:3.12
 
-# Data processing modules:
-    RUN pip install --no-cache \
-    huggingface-hub \
-    pysbd
+# Data processing module:
+    RUN pip install --no-cache pysbd
 
 # CPU-only Torch module:
 RUN pip install --no-cache \
@@ -11,14 +9,16 @@ RUN pip install --no-cache \
 
 # Fupi core modules:
 RUN pip install --no-cache \
-    ctranslate2 \
+    # ctranslate2 \
     duckdb \
+    huggingface-hub \
     lancedb \
     minio \
     onnxruntime \
     pandas \
     pyarrow \
     python-dotenv \
+    # sentencepiece \
     transformers
 
 # Fupi Gradio search application module:

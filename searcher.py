@@ -102,7 +102,7 @@ def translation_model_starter() -> True:
         if all(inspected_filelist):
             break
         else:
-            gr.Info('Downloading the translation model.')
+            gr.Info('Loading the translation model ...')
 
             global models_bucket_name
 
@@ -152,7 +152,7 @@ def embedding_model_starter() -> True:
         if all(inspected_filelist):
             break
         else:
-            gr.Info('Downloading the embedding model.')
+            gr.Info('Loading the embedding model ...')
 
             global models_bucket_name
 
@@ -220,8 +220,12 @@ def lancedb_searcher(
         embedding_model_starter()
         embedding_model_time = time.time() - embedding_model_start_time
 
-        initializatin_info['Embedding Model Initialization Time'] = (
-            f'{embedding_model_time:.3f} s'
+        embedding_model_time_string = (
+            str(f'{embedding_model_time:.3f}').zfill(6)
+        )
+
+        initializatin_info['Embedding Model Load Time ---- '] = (
+            f'{embedding_model_time_string} s'
         )
 
     # Initiate the translation model if necessary:
@@ -230,8 +234,12 @@ def lancedb_searcher(
         translation_model_starter()
         translation_model_time = time.time() - translation_model_start_time
 
-        initializatin_info['Translation Model Initialization Time'] = (
-            f'{translation_model_time:.3f} s'
+        translation_model_time_string = (
+            str(f'{translation_model_time:.3f}').zfill(6)
+        )
+
+        initializatin_info['Translation Model Load Time -- '] = (
+            f'{translation_model_time_string} s'
         )
 
     # Start measuring tokenization and embedding time:
@@ -278,28 +286,6 @@ def lancedb_searcher(
 
         translation_time = time.time() - translation_start_time
 
-        # Prepare search info:
-        total_time = (
-            embedding_model_time +
-            translation_model_time +
-            query_embedding_time +
-            search_time +
-            translation_time
-        )
-
-        search_info = {
-            'Query Embedding Time': f'{query_embedding_time:.3f} s',
-            'LanceDB Search Time':  f'{search_time:.3f} s',
-            'Translation Time':     f'{translation_time:.3f} s',
-            'Total Time':           f'{total_time:.3f} s',
-        }
-
-        if initializatin_info:
-            combined_search_info = {}
-            combined_search_info.update(initializatin_info)
-            combined_search_info.update(search_info)
-            search_info = combined_search_info
-
     # ColBERT Centroids search:
     if (search_type == 'Sentence ColBERT Centroids'):
         search_start_time = time.time()
@@ -320,27 +306,32 @@ def lancedb_searcher(
 
         translation_time = time.time() - translation_start_time
 
-        # Prepare search info:
-        total_time = (
-            embedding_model_time +
-            translation_model_time +
-            query_embedding_time +
-            search_time +
-            translation_time
-        )
+    # Prepare search info:
+    total_time = (
+        embedding_model_time +
+        translation_model_time +
+        query_embedding_time +
+        search_time +
+        translation_time
+    )
 
-        search_info = {
-            'Query Embedding Time': f'{query_embedding_time:.3f} s',
-            'LanceDB Search Time':  f'{search_time:.3f} s',
-            'Translation Time':     f'{translation_time:.3f} s',
-            'Total Time':           f'{total_time:.3f} s',
-        }
+    query_embedding_time_string = str(f'{query_embedding_time:.3f}').zfill(6)
+    search_time_string          = str(f'{search_time:.3f}').zfill(6)
+    translation_time_string     = str(f'{translation_time:.3f}').zfill(6)
+    total_time_string           = str(f'{total_time:.3f}').zfill(6)
 
-        if initializatin_info:
-            combined_search_info = {}
-            combined_search_info.update(initializatin_info)
-            combined_search_info.update(search_info)
-            search_info = combined_search_info
+    search_info = {
+        'Query Embedding Time --------- ': f'{query_embedding_time_string} s',
+        'LanceDB Search Time ---------- ': f'{search_time_string} s',
+        'Translation Time ------------- ': f'{translation_time_string} s',
+        'Total Time ------------------- ': f'{total_time_string} s',
+    }
+
+    if initializatin_info:
+        combined_search_info = {}
+        combined_search_info.update(initializatin_info)
+        combined_search_info.update(search_info)
+        search_info = combined_search_info
 
     memory_usage_megabytes = round(
         (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024),

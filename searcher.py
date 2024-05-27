@@ -291,7 +291,7 @@ def lancedb_searcher(
             'Query Embedding Time': f'{query_embedding_time:.3f} s',
             'LanceDB Search Time':  f'{search_time:.3f} s',
             'Translation Time':     f'{translation_time:.3f} s',
-            'Total Time':           f'{total_time + search_time:.3f} s',
+            'Total Time':           f'{total_time:.3f} s',
         }
 
         if initializatin_info:
@@ -333,7 +333,7 @@ def lancedb_searcher(
             'Query Embedding Time': f'{query_embedding_time:.3f} s',
             'LanceDB Search Time':  f'{search_time:.3f} s',
             'Translation Time':     f'{translation_time:.3f} s',
-            'Total Time':           f'{total_time + search_time:.3f} s',
+            'Total Time':           f'{total_time:.3f} s',
         }
 
         if initializatin_info:

@@ -454,7 +454,7 @@ def main():
             with gr.Column(scale=30):
                 gr.Markdown(
                     '''
-                    **License:** Apache License 2.0.  
+                    **License: Apache License 2.0.**  
                     **https://github.com/ddmitov/fupi**  
                     **https://fupi.fly.dev**  
                     '''
@@ -463,7 +463,7 @@ def main():
             with gr.Column(scale=40):
                 gr.Markdown(
                     '''
-                    **Dataset:** Common Crawl News - 2021 Bulgarian  
+                    **Dataset: Common Crawl News - 2021 Bulgarian**  
                     **https://commoncrawl.org/blog/news-dataset-available**  
                     **https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual**  
                     '''
@@ -472,9 +472,8 @@ def main():
             with gr.Column(scale=30):
                 gr.Markdown(
                     '''
-                    **Model:** BGE-M3  
-                    **https://huggingface.co/BAAI/bge-m3**  
-                    **https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx**  
+                    **Embedding Model: ddmitov/bge_m3_dense_colbert_onnx**  
+                    **Translation Model: michaelfeil/ct2fast-m2m100_418M**  
                     '''
                 )
 

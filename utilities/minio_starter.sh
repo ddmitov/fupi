@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# ./utilities/minio_starter.sh
+
 source .env
 
 docker run \

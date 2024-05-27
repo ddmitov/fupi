@@ -1,27 +1,34 @@
 FROM python:3.12
 
-# Data processing module:
-    RUN pip install --no-cache pysbd
-
 # CPU-only Torch module:
 RUN pip install --no-cache \
     torch --index-url https://download.pytorch.org/whl/cpu
 
-# Fupi core modules:
+# Fupi common modules:
 RUN pip install --no-cache \
-    # ctranslate2 \
-    duckdb \
     huggingface-hub \
-    lancedb \
     minio \
-    onnxruntime \
-    pandas \
-    pyarrow \
     python-dotenv \
-    # sentencepiece \
     transformers
 
-# Fupi Gradio search application module:
+# Fupi semantic search modules:
+    RUN pip install --no-cache \
+    duckdb \
+    lancedb \
+    onnxruntime \
+    pandas \
+    pyarrow
+
+# Fupi translation modules:
+    RUN pip install --no-cache \
+    ctranslate2 \
+    hf_hub_ctranslate2 \
+    sentencepiece
+
+# Data processing module:
+    RUN pip install --no-cache pysbd
+
+# Gradio search application module:
 RUN pip install --no-cache gradio
 
 # LanceDB settings:

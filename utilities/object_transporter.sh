@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# ./utilities/object_transporter.sh
+
 source .env
 
 if ! test -f ./mc; then
@@ -17,5 +19,6 @@ fi
 
 ./mc --config-dir ./mc_cfg mb tigris/$TIGRIS_MODELS_BUCKET
 ./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_MODELS_BUCKET/bge-m3 tigris/$TIGRIS_MODELS_BUCKET
+./mc --config-dir ./mc_cfg cp --recursive minio/$MINIO_MODELS_BUCKET/ct2fast-m2m100_418m tigris/$TIGRIS_MODELS_BUCKET
 
 rm -rf ./mc_cfg

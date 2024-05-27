@@ -35,18 +35,18 @@ def model_downloader_from_object_storage(
     bucket_name: str,
     bucket_prefix: str
 ) -> True:
-    minio_endpoint = str(os.environ['AWS_ENDPOINT'])
+    endpoint = str(os.environ['AWS_ENDPOINT'])
     secure_mode = None
 
-    if 'https' in minio_endpoint:
-        minio_endpoint = minio_endpoint.replace('https://', '')
+    if 'https' in endpoint:
+        endpoint = endpoint.replace('https://', '')
         secure_mode = True
     else:
-        minio_endpoint = minio_endpoint.replace('http://', '')
+        endpoint = endpoint.replace('http://', '')
         secure_mode = False
 
     client = Minio(
-        minio_endpoint,
+        endpoint,
         access_key=os.environ['AWS_ACCESS_KEY_ID'],
         secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
         secure=secure_mode
@@ -165,7 +165,7 @@ def fupi_dense_vectors_searcher(
     .limit(10)\
     .to_pandas()
 
-    dense_final_dataframe = duckdb.query(
+    dense_search_result_dataframe = duckdb.query(
         f'''
             WITH
                 combined_results_cte AS (
@@ -204,9 +204,7 @@ def fupi_dense_vectors_searcher(
         '''
     ).fetch_arrow_table().to_pandas()
 
-    search_result = dense_final_dataframe.to_dict('records')
-
-    return search_result
+    return dense_search_result_dataframe
 
 
 def fupi_colbert_centroids_searcher(
@@ -229,7 +227,7 @@ def fupi_colbert_centroids_searcher(
     .limit(10)\
     .to_pandas()
 
-    colbert_final_dataframe = duckdb.query(
+    colbert_search_result_dataframe = duckdb.query(
         f'''
             WITH
                 combined_results_cte AS (
@@ -268,6 +266,4 @@ def fupi_colbert_centroids_searcher(
         '''
     ).fetch_arrow_table().to_pandas()
 
-    search_result = colbert_final_dataframe.to_dict('records')
-
-    return search_result
+    return colbert_search_result_dataframe

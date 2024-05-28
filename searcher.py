@@ -376,23 +376,23 @@ def main():
 
     # Object storage settings for Fly.io - Tigris deployment:
     if os.environ.get('FLY_APP_NAME') is not None:
-        os.environ['AWS_ENDPOINT']          = os.environ['TIGRIS_ENDPOINT_S3']
-        os.environ['AWS_ACCESS_KEY_ID']     = os.environ['TIGRIS_ACCESS_KEY_ID']
-        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['TIGRIS_SECRET_ACCESS_KEY']
+        os.environ['AWS_ENDPOINT']          = os.environ['PROD_ENDPOINT_S3']
+        os.environ['AWS_ACCESS_KEY_ID']     = os.environ['PROD_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
         os.environ['AWS_REGION'] = 'auto'
 
-        lancedb_bucket_name = os.environ['TIGRIS_LANCEDB_BUCKET']
-        models_bucket_name  = os.environ['TIGRIS_MODELS_BUCKET']
+        lancedb_bucket_name = os.environ['PROD_LANCEDB_BUCKET']
+        models_bucket_name  = os.environ['PROD_MODELS_BUCKET']
     # Object storage settings for local development:
     else:
-        os.environ['AWS_ENDPOINT']          = os.environ['MINIO_ENDPOINT_S3']
-        os.environ['AWS_ACCESS_KEY_ID']     = os.environ['MINIO_ACCESS_KEY_ID']
-        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
+        os.environ['AWS_ENDPOINT']          = os.environ['DEV_ENDPOINT_S3']
+        os.environ['AWS_ACCESS_KEY_ID']     = os.environ['DEV_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['DEV_SECRET_ACCESS_KEY']
         os.environ['AWS_REGION']            = 'us-east-1'
         os.environ['ALLOW_HTTP']            = 'True'
 
-        lancedb_bucket_name = os.environ['MINIO_LANCEDB_BUCKET']
-        models_bucket_name  = os.environ['MINIO_MODELS_BUCKET']
+        lancedb_bucket_name = os.environ['DEV_LANCEDB_BUCKET']
+        models_bucket_name  = os.environ['DEV_MODELS_BUCKET']
 
     # Define LanceDB tables:
     lance_db = lancedb.connect(f's3://{lancedb_bucket_name}/')

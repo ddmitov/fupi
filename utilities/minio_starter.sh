@@ -10,7 +10,7 @@ docker run \
    --rm \
    --user $(id -u):$(id -g) \
    --name minio \
-   -e "MINIO_ROOT_USER=$MINIO_ACCESS_KEY_ID" \
-   -e "MINIO_ROOT_PASSWORD=$MINIO_SECRET_ACCESS_KEY" \
+   -e "MINIO_ROOT_USER=$DEV_ACCESS_KEY_ID" \
+   -e "MINIO_ROOT_PASSWORD=$DEV_SECRET_ACCESS_KEY" \
    -v ./data/minio:/data \
    quay.io/minio/minio server /data --console-address ":9001"

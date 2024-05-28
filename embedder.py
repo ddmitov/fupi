@@ -13,7 +13,7 @@ import pandas as pd
 import pysbd
 from transformers import AutoTokenizer
 
-# from fupi import model_downloader_from_hugging_face
+from fupi import model_downloader_from_hugging_face
 from fupi import ort_session_starter_for_text_embedding
 from fupi import lancedb_tables_creator
 from fupi import centroid_maker_for_arrays
@@ -25,12 +25,12 @@ from fupi import centroid_maker_for_series
 load_dotenv(find_dotenv())
 
 # LanceDB object storage settings:
-os.environ['AWS_ENDPOINT'] = os.environ['MINIO_ENDPOINT_S3']
-os.environ['AWS_ACCESS_KEY_ID'] = os.environ['MINIO_ACCESS_KEY_ID']
-os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['MINIO_SECRET_ACCESS_KEY']
+os.environ['AWS_ENDPOINT'] = os.environ['PROD_ENDPOINT_S3']
+os.environ['AWS_ACCESS_KEY_ID'] = os.environ['PROD_ACCESS_KEY_ID']
+os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
 os.environ['AWS_REGION'] = 'us-east-1'
 
-os.environ['ALLOW_HTTP'] = 'True'
+# os.environ['ALLOW_HTTP'] = 'True'
 
 # Input data settings:
 INPUT_ITEMS_PER_BATCH = 100
@@ -68,7 +68,6 @@ def main():
     logger = logger_starter()
     total_time = 0
 
-    # Download testing data from a Hugging Face dataset:
     print('')
     print('Downloading testing data from Hugging Face ...')
     print('')
@@ -97,24 +96,24 @@ def main():
                 AND title IS NOT NULL
                 AND maintext IS NOT NULL
                 AND title NOT LIKE '%...'
-            LIMIT 5000
+            LIMIT 10000
         '''
     ).to_arrow_table().to_pylist()
 
-    # print('')
-    # print('Downloading the BGE-M3 embedding model from Hugging Face ...')
-    # print('')
+    print('')
+    print('Downloading the BGE-M3 embedding model from Hugging Face ...')
+    print('')
 
-    # model_downloader_from_hugging_face()
+    model_downloader_from_hugging_face()
 
     ort_session = ort_session_starter_for_text_embedding()
 
     # Initialize tokenizer:
-    tokenizer = AutoTokenizer.from_pretrained('/tmp/model/')
+    tokenizer = AutoTokenizer.from_pretrained('ddmitov/bge_m3_dense_colbert_onnx')
 
     # Create LanceDB tables:
     text_level_table, sentence_level_table = (
-        lancedb_tables_creator(os.environ['MINIO_LANCEDB_BUCKET'])
+        lancedb_tables_creator(os.environ['PROD_LANCEDB_BUCKET'])
     )
 
     # Get input data: 

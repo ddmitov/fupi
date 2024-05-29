@@ -25,10 +25,10 @@ from fupi import centroid_maker_for_series
 load_dotenv(find_dotenv())
 
 # LanceDB object storage settings:
-os.environ['AWS_ENDPOINT'] = os.environ['PROD_ENDPOINT_S3']
-os.environ['AWS_ACCESS_KEY_ID'] = os.environ['PROD_ACCESS_KEY_ID']
+os.environ['AWS_ENDPOINT']          = os.environ['PROD_ENDPOINT_S3']
+os.environ['AWS_ACCESS_KEY_ID']     = os.environ['PROD_ACCESS_KEY_ID']
 os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
-os.environ['AWS_REGION'] = 'us-east-1'
+os.environ['AWS_REGION']            = 'us-east-1'
 
 # os.environ['ALLOW_HTTP'] = 'True'
 
@@ -327,6 +327,8 @@ def main():
 
     print('All LanceDB tables are compacted.')
     print('')
+
+    return True
 
 
 if __name__ == '__main__':

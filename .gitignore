@@ -1,8 +1,10 @@
 __pycache__
+archive
 data
 mc_cfg
 
 .env
 backup
 mc
+rclone
 upgit

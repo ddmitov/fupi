@@ -374,12 +374,12 @@ def main():
     lancedb_bucket_name = None
     global models_bucket_name
 
-    # Object storage settings for Fly.io - Tigris deployment:
+    # Object storage settings for Fly.io deployment:
     if os.environ.get('FLY_APP_NAME') is not None:
         os.environ['AWS_ENDPOINT']          = os.environ['PROD_ENDPOINT_S3']
         os.environ['AWS_ACCESS_KEY_ID']     = os.environ['PROD_ACCESS_KEY_ID']
         os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
-        os.environ['AWS_REGION'] = 'auto'
+        os.environ['AWS_REGION']            = 'auto'
 
         lancedb_bucket_name = os.environ['PROD_LANCEDB_BUCKET']
         models_bucket_name  = os.environ['PROD_MODELS_BUCKET']
@@ -423,7 +423,7 @@ def main():
     search_results_box=gr.JSON(label='Search Results', show_label=True)
 
     # Dark theme by default:
-    js_function = """
+    javascript_function = """
         function refresh() {
             const url = new URL(window.location);
 
@@ -437,7 +437,7 @@ def main():
     # Initialize Gradio interface:
     gradio_interface = gr.Blocks(
         theme=gr.themes.Glass(),
-        js=js_function,
+        js=javascript_function,
         title='Fupi'
     )
 

@@ -496,7 +496,7 @@ def main():
             with gr.Column(scale=30):
                 gr.Markdown(
                     '''
-                    Dataset: Common Crawl News - 2021 Bulgarian  
+                    Dataset: Common Crawl News - 2021 Bulgarian - 10 000 texts  
                     https://commoncrawl.org/blog/news-dataset-available  
                     https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
                     '''

@@ -418,12 +418,20 @@ def main():
         label='Search Type',
     )
 
-    search_info_box=gr.JSON(label='Search Info', show_label=True)
+    search_info_box=gr.JSON(
+        label='Search Info',
+        show_label=True,
+        elem_classes='search'
+    )
 
-    search_results_box=gr.JSON(label='Search Results', show_label=True)
+    search_results_box=gr.JSON(
+        label='Search Results',
+        show_label=True,
+        elem_classes='search'
+    )
 
     # Dark theme by default:
-    javascript_function = """
+    javascript_code = '''
         function refresh() {
             const url = new URL(window.location);
 
@@ -432,12 +440,37 @@ def main():
                 window.location.href = url.href;
             }
         }
-    """
+    '''
+
+    css_code = '''
+        a:link {
+            color: white;
+            text-decoration: none;
+        }
+
+        a:visited {
+            color: white;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: white;
+            text-decoration: none;
+        }
+
+        a:active {
+            color: white;
+            text-decoration: none;
+        }
+
+        .search {font-size: 16px !important}
+    '''
 
     # Initialize Gradio interface:
     gradio_interface = gr.Blocks(
         theme=gr.themes.Glass(),
-        js=javascript_function,
+        js=javascript_code,
+        css=css_code,
         title='Fupi'
     )
 
@@ -454,26 +487,26 @@ def main():
             with gr.Column(scale=30):
                 gr.Markdown(
                     '''
-                    **License: Apache License 2.0.**  
-                    **https://github.com/ddmitov/fupi**  
-                    **https://fupi.fly.dev**  
-                    '''
-                )
-
-            with gr.Column(scale=40):
-                gr.Markdown(
-                    '''
-                    **Dataset: Common Crawl News - 2021 Bulgarian**  
-                    **https://commoncrawl.org/blog/news-dataset-available**  
-                    **https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual**  
+                    https://github.com/ddmitov/fupi  
+                    https://fupi.fly.dev  
+                    License: Apache License 2.0.  
                     '''
                 )
 
             with gr.Column(scale=30):
                 gr.Markdown(
                     '''
-                    **Embedding Model: ddmitov/bge_m3_dense_colbert_onnx**  
-                    **Translation Model: michaelfeil/ct2fast-m2m100_418M**  
+                    Dataset: Common Crawl News - 2021 Bulgarian  
+                    https://commoncrawl.org/blog/news-dataset-available  
+                    https://huggingface.co/datasets/CloverSearch/cc-news-mutlilingual  
+                    '''
+                )
+
+            with gr.Column(scale=40):
+                gr.Markdown(
+                    '''
+                    Embedding Model: https://huggingface.co/ddmitov/bge_m3_dense_colbert_onnx  
+                    Translation Model: https://huggingface.co/michaelfeil/ct2fast-m2m100_418M  
                     '''
                 )
 

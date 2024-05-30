@@ -48,7 +48,7 @@ Today we use complex machine learning technologies thanks to the knowledge, pers
 
 This program is licensed under the terms of the Apache License 2.0.
 
-## Author
+## Authors
 
 [Dimitar D. Mitov](https://www.linkedin.com/in/dimitar-mitov-12388982/), 2024,  
 [Adam Fauzi](https://www.linkedin.com/in/adam-fauzi-95a9322a1/), 2024

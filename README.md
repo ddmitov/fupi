@@ -20,10 +20,35 @@ Today we use complex machine learning technologies thanks to the knowledge, pers
 
 ## [Thanks and Credits](./CREDITS.md)
 
+## Citations
+
+```bibtex
+@misc{bge-m3,
+      title={BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation}, 
+      author={Jianlv Chen and Shitao Xiao and Peitian Zhang and Kun Luo and Defu Lian and Zheng Liu},
+      year={2024},
+      eprint={2402.03216},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
+
+```bibtex
+@misc{fan2020englishcentric,
+      title={Beyond English-Centric Multilingual Machine Translation}, 
+      author={Angela Fan and Shruti Bhosale and Holger Schwenk and Zhiyi Ma and Ahmed El-Kishky and Siddharth Goyal and Mandeep Baines and Onur Celebi and Guillaume Wenzek and Vishrav Chaudhary and Naman Goyal and Tom Birch and Vitaliy Liptchinsky and Sergey Edunov and Edouard Grave and Michael Auli and Armand Joulin},
+      year={2020},
+      eprint={2010.11125},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
+
 ## [License](./LICENSE)
 
 This program is licensed under the terms of the Apache License 2.0.
 
 ## Author
 
-Dimitar D. Mitov, 2024
+[Dimitar D. Mitov](https://www.linkedin.com/in/dimitar-mitov-12388982/), 2024,  
+[Adam Fauzi](https://www.linkedin.com/in/adam-fauzi-95a9322a1/), 2024

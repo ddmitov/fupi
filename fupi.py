@@ -17,14 +17,14 @@ def model_downloader_from_hugging_face() -> True:
     hf_hub_download(
         repo_id='ddmitov/bge_m3_dense_colbert_onnx',
         filename='model.onnx',
-        local_dir='/tmp/model',
+        local_dir='/home/fupi_data/model',
         repo_type='model'
     )
 
     hf_hub_download(
         repo_id='ddmitov/bge_m3_dense_colbert_onnx',
         filename='model.onnx_data',
-        local_dir='/tmp/model',
+        local_dir='/home/fupi_data/model',
         repo_type='model'
     )
 
@@ -61,7 +61,7 @@ def model_downloader_from_object_storage(
         client.fget_object(
             bucket_name,
             item.object_name,
-            '/tmp/' + item.object_name
+            '/home/fupi_data/' + item.object_name
         )
 
     return True
@@ -125,7 +125,7 @@ def ort_session_starter_for_text_embedding() -> ort.InferenceSession:
 
     # Initialize ONNX runtime session:
     ort_session = ort.InferenceSession(
-        '/tmp/model/model.onnx',
+        '/home/fupi_data/model/model.onnx',
         sess_ptions=onnxrt_options,
         providers=['CPUExecutionProvider']
     )

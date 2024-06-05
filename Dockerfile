@@ -12,7 +12,7 @@ RUN pip install --no-cache \
     transformers
 
 # Fupi semantic search modules:
-    RUN pip install --no-cache \
+RUN pip install --no-cache \
     duckdb \
     lancedb \
     onnxruntime \
@@ -20,13 +20,13 @@ RUN pip install --no-cache \
     pyarrow
 
 # Fupi translation modules:
-    RUN pip install --no-cache \
+RUN pip install --no-cache \
     ctranslate2 \
     hf_hub_ctranslate2 \
     sentencepiece
 
 # Data processing module:
-    RUN pip install --no-cache pysbd
+RUN pip install --no-cache pysbd
 
 # Gradio search application module:
 RUN pip install --no-cache gradio
@@ -46,10 +46,13 @@ RUN mkdir /.config/matplotlib
 RUN chmod 777 /.config/matplotlib
 
 RUN mkdir /home/fupi
+RUN mkdir /home/fupi_data
 
 COPY ./.env /home/fupi/.env
 COPY ./fupi.py /home/fupi/fupi.py
 COPY ./searcher.py /home/fupi/searcher.py
+COPY ./embedder_docker.py /home/fupi/embedder.py
+COPY ./utilities/models_loader_dev.py /home/fupi/models_loader.py
 
 # Start Fupi Gradio search application by default:
 EXPOSE 7860

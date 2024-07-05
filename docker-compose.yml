@@ -1,0 +1,61 @@
+name: fupi-app
+
+services:
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_ACCESS_KEY}
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - fupi
+    command: server /data --console-address ":9001"
+
+  embedder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      S3_ENDPOINT: ${MINIO_ENDPOINT_S3}
+      ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
+      SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
+      LANCEDB_BUCKET: ${MINIO_LANCEDB_BUCKET}
+      MODELS_BUCKET: ${MINIO_MODELS_BUCKET}
+    volumes:
+      - .:/app
+      - ./data/embedder_data:/home/fupi_data
+    networks:
+      - fupi
+    command: bash -c "python /home/fupi/models_loader.py && python /home/fupi/embedder.py"
+    depends_on:
+      - minio
+  
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "7860:7860"
+    environment:
+      DEV_ENDPOINT_S3: ${MINIO_ENDPOINT_S3}
+      DEV_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
+      DEV_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
+      DEV_LANCEDB_BUCKET: ${MINIO_LANCEDB_BUCKET}
+      DEV_MODELS_BUCKET: ${MINIO_MODELS_BUCKET}
+    volumes:
+      - .:/app
+    networks:
+      - fupi
+    command: python /home/fupi/searcher.py
+    depends_on:
+      - minio
+      - embedder
+
+networks:
+  fupi:
+    driver: bridge

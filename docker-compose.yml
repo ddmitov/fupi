@@ -1,61 +1,76 @@
-name: fupi-app
+name: fupi
+
+# FUPI_UID="$(id -u)" FUPI_GID="$(id -g)" docker compose up
 
 services:
-
   minio:
     image: minio/minio
+    user: "${FUPI_UID}:${FUPI_GID}"
+    networks:
+      - savanna
+    hostname: minio
     ports:
       - "9000:9000"
       - "9001:9001"
+    env_file: ".env"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY_ID}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_ACCESS_KEY}
+      - MINIO_ROOT_USER=${DEV_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${DEV_SECRET_ACCESS_KEY}
     volumes:
       - ./data/minio:/data
+    command: server /data --address ":9000" --console-address ":9001"
+
+  models-loader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "${FUPI_UID}:${FUPI_GID}"
+    env_file: ".env"
+    volumes:
+      - .:/app
     networks:
-      - fupi
-    command: server /data --console-address ":9001"
+      - savanna
+    command: python /app/utilities/models_loader_dev.py
+    depends_on:
+      minio:
+        condition: service_started
 
   embedder:
     build:
       context: .
       dockerfile: Dockerfile
-    environment:
-      S3_ENDPOINT: ${MINIO_ENDPOINT_S3}
-      ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
-      SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
-      LANCEDB_BUCKET: ${MINIO_LANCEDB_BUCKET}
-      MODELS_BUCKET: ${MINIO_MODELS_BUCKET}
+    user: "${FUPI_UID}:${FUPI_GID}"
+    env_file: ".env"
     volumes:
       - .:/app
-      - ./data/embedder_data:/home/fupi_data
     networks:
-      - fupi
-    command: bash -c "python /home/fupi/models_loader.py && python /home/fupi/embedder.py"
+      - savanna
+    command: python /app/embedder.py
     depends_on:
-      - minio
-  
-  app:
+      minio:
+        condition: service_started
+      models-loader:
+        condition: service_completed_successfully
+
+  searcher:
     build:
       context: .
       dockerfile: Dockerfile
+    user: "${FUPI_UID}:${FUPI_GID}"
+    networks:
+      - savanna
     ports:
       - "7860:7860"
-    environment:
-      DEV_ENDPOINT_S3: ${MINIO_ENDPOINT_S3}
-      DEV_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY_ID}
-      DEV_SECRET_ACCESS_KEY: ${MINIO_SECRET_ACCESS_KEY}
-      DEV_LANCEDB_BUCKET: ${MINIO_LANCEDB_BUCKET}
-      DEV_MODELS_BUCKET: ${MINIO_MODELS_BUCKET}
+    env_file: ".env"
     volumes:
       - .:/app
-    networks:
-      - fupi
-    command: python /home/fupi/searcher.py
+    command: python /app/searcher.py
     depends_on:
-      - minio
-      - embedder
+      minio:
+        condition: service_started
+      embedder:
+        condition: service_completed_successfully
 
 networks:
-  fupi:
+  savanna:
     driver: bridge

@@ -14,7 +14,7 @@ from hf_hub_ctranslate2 import MultiLingualTranslatorCT2fromHfHub
 import lancedb
 import onnxruntime as ort
 import pandas as pd
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, M2M100Tokenizer
 import uvicorn
 
 from fupi import model_downloader_from_object_storage
@@ -93,23 +93,20 @@ def translation_model_starter() -> True:
         '/tmp/ct2fast-m2m100_418m/vocab.json'
     ]
 
-    while True:
-        inspected_filelist = []
+    inspected_filelist = []
 
-        for file in translation_model_filelist:
-            inspected_filelist.append(os.path.isfile(file))
+    for file in translation_model_filelist:
+        inspected_filelist.append(os.path.isfile(file))
 
-        if all(inspected_filelist):
-            break
-        else:
-            gr.Info('Loading the translation model ...')
+    if not all(inspected_filelist):
+        gr.Info('Loading the translation model ...')
 
-            global models_bucket_name
+        global models_bucket_name
 
-            model_downloader_from_object_storage(
-                models_bucket_name,
-                'ct2fast-m2m100_418m'
-            )
+        model_downloader_from_object_storage(
+            models_bucket_name,
+            'ct2fast-m2m100_418m'
+        )
 
     # Initialize translation model:
     global translation_model
@@ -119,7 +116,9 @@ def translation_model_starter() -> True:
     #     model_name_or_path='/tmp/ct2fast-m2m100_418m',
     #     device='cuda',
     #     compute_type='float32',
-    #     tokenizer=AutoTokenizer.from_pretrained('/tmp/ct2fast-m2m100_418m')
+    #     tokenizer=M2M100Tokenizer.from_pretrained(
+    #         '/tmp/ct2fast-m2m100_418m'
+    #     )
     # )
 
     # Initialize translation model using CPU:
@@ -127,7 +126,9 @@ def translation_model_starter() -> True:
         model_name_or_path='/tmp/ct2fast-m2m100_418m',
         device='cpu',
         compute_type='int8',
-        tokenizer=AutoTokenizer.from_pretrained('/tmp/ct2fast-m2m100_418m')
+        tokenizer=M2M100Tokenizer.from_pretrained(
+            '/tmp/ct2fast-m2m100_418m'
+        )
     )
 
     return True
@@ -143,23 +144,20 @@ def embedding_model_starter() -> True:
         '/tmp/bge-m3/tokenizer.json'
     ]
 
-    while True:
-        inspected_filelist = []
+    inspected_filelist = []
 
-        for file_name in embedding_model_filelist:
-            inspected_filelist.append(os.path.isfile(file_name))
+    for file_name in embedding_model_filelist:
+        inspected_filelist.append(os.path.isfile(file_name))
 
-        if all(inspected_filelist):
-            break
-        else:
-            gr.Info('Loading the embedding model ...')
+    if not all(inspected_filelist):
+        gr.Info('Loading the embedding model ...')
 
-            global models_bucket_name
+        global models_bucket_name
 
-            model_downloader_from_object_storage(
-                models_bucket_name,
-                'bge-m3'
-            )
+        model_downloader_from_object_storage(
+            models_bucket_name,
+            'bge-m3'
+        )
 
     # Initialize ONNX runtime session:
     global onnx_runtime_session

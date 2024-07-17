@@ -12,8 +12,9 @@ import onnxruntime as ort
 import pandas as pd
 import pysbd
 from transformers import AutoTokenizer
+from minio import Minio
 
-from fupi import model_downloader_from_hugging_face
+from fupi import model_downloader_from_object_storage
 from fupi import ort_session_starter_for_text_embedding
 from fupi import lancedb_tables_creator
 from fupi import centroid_maker_for_arrays
@@ -25,14 +26,19 @@ from fupi import centroid_maker_for_series
 load_dotenv(find_dotenv())
 
 # LanceDB object storage settings:
-os.environ['AWS_ENDPOINT']          = os.environ['PROD_ENDPOINT_S3']
-os.environ['AWS_ACCESS_KEY_ID']     = os.environ['PROD_ACCESS_KEY_ID']
-os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
-os.environ['AWS_REGION']            = 'us-east-1'
+# os.environ['AWS_ENDPOINT']          = os.environ['PROD_ENDPOINT_S3']
+# os.environ['AWS_ACCESS_KEY_ID']     = os.environ['PROD_ACCESS_KEY_ID']
+# os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['PROD_SECRET_ACCESS_KEY']
+# os.environ['AWS_REGION']            = 'us-east-1'
 
-# os.environ['ALLOW_HTTP'] = 'True'
+os.environ['AWS_ENDPOINT']          = os.environ['DEV_ENDPOINT_S3']
+os.environ['AWS_ACCESS_KEY_ID']     = os.environ['DEV_ACCESS_KEY_ID']
+os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['DEV_SECRET_ACCESS_KEY']
+os.environ['AWS_REGION']            = 'us-east-1'
+os.environ['ALLOW_HTTP']            = 'True'
 
 # Input data settings:
+TOTAL_NUM_TEXTS = 100
 INPUT_ITEMS_PER_BATCH = 100
 
 
@@ -50,6 +56,11 @@ def logger_starter():
         datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     )
 
+    log_dir = '/app/data/logs'
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
     logging.basicConfig(
         level=logging.DEBUG,
         datefmt='%Y-%m-%d %H:%M:%S',
@@ -63,19 +74,62 @@ def logger_starter():
     return logger
 
 
+def create_dataset_bucket(minio_client: Minio, bucket_name: str):
+    if not minio_client.bucket_exists(bucket_name):
+        minio_client.make_bucket(bucket_name)
+
+        print(f'{bucket_name} bucket was created.')
+
+
+def init_minio() -> Minio:
+    # Initiate MinIO client:
+    endpoint = str(os.environ['AWS_ENDPOINT'])
+    secure_mode = None
+
+    if 'https' in endpoint:
+        endpoint = endpoint.replace('https://', '')
+        secure_mode = True
+    else:
+        endpoint = endpoint.replace('http://', '')
+        secure_mode = False
+    
+    minio_client = Minio(
+        endpoint,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=secure_mode
+    )
+
+    return minio_client
+
+
 def main():
     # Start logging: 
     logger = logger_starter()
     total_time = 0
 
+    # Creating LanceDB tables:
+    minio_client = init_minio()
+
+    create_dataset_bucket(
+        minio_client, 
+        bucket_name=os.environ['DEV_LANCEDB_BUCKET']
+    )
+
+    text_level_table, sentence_level_table = (
+        lancedb_tables_creator(os.environ['DEV_LANCEDB_BUCKET'])
+    )
+
+    logger.info('Loading data ...')
+
     print('')
-    print('Downloading testing data from Hugging Face ...')
+    print('Loading data ...')
     print('')
 
     hf_hub_download(
         repo_id='CloverSearch/cc-news-mutlilingual',
         filename='2021/bg.jsonl.gz',
-        local_dir='/tmp',
+        local_dir='/app/data/huggingface',
         repo_type='dataset'
     )
 
@@ -83,28 +137,30 @@ def main():
 
     duckdb.sql('CREATE SEQUENCE text_id_maker START 1')
 
+    logger.info('Running DuckDB SELECT query ...')
+    print('Running DuckDB SELECT query ...')
+
     input_list = duckdb.sql(
-        '''
+        f'''
             SELECT
                 nextval('text_id_maker') AS text_id,
                 date_publish_final AS date,
                 newlines_remover(title) AS title,
                 newlines_remover(maintext) AS text
-            FROM read_json_auto("/tmp/2021/bg.jsonl.gz")
+            FROM read_json_auto("/app/data/huggingface/2021/bg.jsonl.gz")
             WHERE
                 date_publish_final IS NOT NULL
                 AND title IS NOT NULL
                 AND maintext IS NOT NULL
                 AND title NOT LIKE '%...'
-            LIMIT 10000
+            LIMIT {TOTAL_NUM_TEXTS}
         '''
     ).to_arrow_table().to_pylist()
 
-    print('')
-    print('Downloading the BGE-M3 embedding model from Hugging Face ...')
-    print('')
-
-    model_downloader_from_hugging_face()
+    model_downloader_from_object_storage(
+        os.environ['DEV_MODELS_BUCKET'],
+        'bge-m3'
+    )
 
     ort_session = ort_session_starter_for_text_embedding()
 
@@ -113,7 +169,7 @@ def main():
 
     # Create LanceDB tables:
     text_level_table, sentence_level_table = (
-        lancedb_tables_creator(os.environ['PROD_LANCEDB_BUCKET'])
+        lancedb_tables_creator(os.environ['DEV_LANCEDB_BUCKET'])
     )
 
     # Get input data: 
@@ -319,11 +375,14 @@ def main():
         exit(0)
 
     # Compact all newly created LanceDB tables:
-    print('')
+    logger.info('Compacting LanceDB tables ...')
+
     print('Compacting LanceDB tables ...')
 
     text_level_table.compact_files()
     sentence_level_table.compact_files()
+
+    logger.info('All LanceDB tables are compacted.')
 
     print('All LanceDB tables are compacted.')
     print('')

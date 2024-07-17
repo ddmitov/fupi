@@ -8,26 +8,21 @@ from huggingface_hub import hf_hub_download
 from minio.error import S3Error
 from minio import Minio
 
-# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/utilities/models_loader_dev.py
+# docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app fupi python /app/utilities/models_loader_dev.py
 
-TEMP_DIR = '/app/models'
+TEMP_DIR = '/app/data/models'
 
 # Load settings from .env file:
 load_dotenv(find_dotenv())
 
 # Object storage settings:
-# os.environ['AWS_ENDPOINT']          = os.environ['DEV_ENDPOINT_S3']
-# os.environ['AWS_ACCESS_KEY_ID']     = os.environ['DEV_ACCESS_KEY_ID']
-# os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['DEV_SECRET_ACCESS_KEY']
-# bucket_name                         = os.environ['DEV_MODELS_BUCKET']
-
-os.environ['AWS_ENDPOINT']          = os.environ['S3_ENDPOINT']
-os.environ['AWS_ACCESS_KEY_ID']     = os.environ['ACCESS_KEY_ID']
-os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['SECRET_ACCESS_KEY']
-bucket_name                         = os.environ['MODELS_BUCKET']
+os.environ['AWS_ENDPOINT']          = os.environ['DEV_ENDPOINT_S3']
+os.environ['AWS_ACCESS_KEY_ID']     = os.environ['DEV_ACCESS_KEY_ID']
+os.environ['AWS_SECRET_ACCESS_KEY'] = os.environ['DEV_SECRET_ACCESS_KEY']
+bucket_name                         = os.environ['DEV_MODELS_BUCKET']
 
 
-def model_downloader(
+def model_files_downloader(
     hugging_face_repository: str,
     model_file_list: list,
     prefix: str
@@ -43,7 +38,7 @@ def model_downloader(
     return True
 
 
-def model_uploader(
+def model_files_uploader(
     minio_client: Minio,
     bucket_name: str,
     prefix:str,
@@ -70,37 +65,7 @@ def model_uploader(
     return True
 
 
-def main():
-    # Initiate MinIO client:
-    endpoint = str(os.environ['AWS_ENDPOINT'])
-    secure_mode = None
-
-    if 'https' in endpoint:
-        endpoint = endpoint.replace('https://', '')
-        secure_mode = True
-    else:
-        endpoint = endpoint.replace('http://', '')
-        secure_mode = False
-
-    minio_client = Minio(
-        endpoint,
-        access_key=os.environ['AWS_ACCESS_KEY_ID'],
-        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-        secure=secure_mode
-    )
-
-    try:
-        minio_client.stat_object(bucket_name, 'bge-m3/model.onnx')
-        print("Models are already available. Skipping model uploading.")
-    except S3Error as s3_err:
-        print(f"Error: {s3_err}")
-        print("Uploading models...")
-        upload_data(minio_client)
-
-    return True
-
-
-def upload_data(minio_client: Minio):
+def models_loader(minio_client: Minio) -> True:
     # Embedding model file list:
     embedding_model_file_list = [
         'model.onnx',
@@ -128,7 +93,7 @@ def upload_data(minio_client: Minio):
     print('Downloading the embedding model ...')
     print('')
 
-    model_downloader(
+    model_files_downloader(
         'ddmitov/bge_m3_dense_colbert_onnx',
         embedding_model_file_list,
         'bge-m3'
@@ -139,7 +104,7 @@ def upload_data(minio_client: Minio):
     print('Downloading the translation model ...')
     print('')
 
-    model_downloader(
+    model_files_downloader(
         'michaelfeil/ct2fast-m2m100_418M',
         translation_model_file_list,
         'ct2fast-m2m100_418m'
@@ -150,7 +115,7 @@ def upload_data(minio_client: Minio):
     print('Uploading the embedding model ...')
     print('')
 
-    model_uploader(
+    model_files_uploader(
         minio_client,
         bucket_name,
         'bge-m3',
@@ -162,7 +127,7 @@ def upload_data(minio_client: Minio):
     print('Uploading the translation model ...')
     print('')
 
-    model_uploader(
+    model_files_uploader(
         minio_client,
         bucket_name,
         'ct2fast-m2m100_418m',
@@ -171,6 +136,37 @@ def upload_data(minio_client: Minio):
 
     # Remove the temporary folder:
     shutil.rmtree(TEMP_DIR)
+
+    return True
+
+
+
+def main():
+    # Initiate MinIO client:
+    endpoint = str(os.environ['AWS_ENDPOINT'])
+    secure_mode = None
+
+    if 'https' in endpoint:
+        endpoint = endpoint.replace('https://', '')
+        secure_mode = True
+    else:
+        endpoint = endpoint.replace('http://', '')
+        secure_mode = False
+
+    minio_client = Minio(
+        endpoint,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=secure_mode
+    )
+
+    try:
+        minio_client.stat_object(bucket_name, 'bge-m3/model.onnx')
+        print("Models are already available. Skipping model uploading.")
+    except S3Error as s3_err:
+        models_loader(minio_client)
+
+    return True
 
 
 if __name__ == '__main__':

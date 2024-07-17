@@ -4,26 +4,20 @@ FROM python:3.12
 RUN pip install --no-cache \
     torch --index-url https://download.pytorch.org/whl/cpu
 
-# Fupi common modules:
+# Fupi modules:
 RUN pip install --no-cache \
-    huggingface-hub \
-    minio \
-    python-dotenv \
+    ctranslate2            \
+    duckdb                 \
+    hf_hub_ctranslate2     \
+    huggingface-hub        \
+    lancedb                \
+    minio                  \
+    onnxruntime            \
+    pandas                 \
+    pyarrow                \
+    python-dotenv          \
+    sentencepiece          \
     transformers
-
-# Fupi semantic search modules:
-RUN pip install --no-cache \
-    duckdb \
-    lancedb \
-    onnxruntime \
-    pandas \
-    pyarrow
-
-# Fupi translation modules:
-RUN pip install --no-cache \
-    ctranslate2 \
-    hf_hub_ctranslate2 \
-    sentencepiece
 
 # Data processing module:
 RUN pip install --no-cache pysbd
@@ -32,27 +26,25 @@ RUN pip install --no-cache pysbd
 RUN pip install --no-cache gradio
 
 # LanceDB settings:
-RUN mkdir /.cache
+RUN mkdir     /.cache
 RUN chmod 777 /.cache
 
-RUN mkdir /.config
+RUN mkdir     /.config
 RUN chmod 777 /.config
 
-RUN mkdir /.config/lancedb
+RUN mkdir     /.config/lancedb
 RUN chmod 777 /.config/lancedb
 
 # Fupi Gradio search application settings:
-RUN mkdir /.config/matplotlib
+RUN mkdir     /.config/matplotlib
 RUN chmod 777 /.config/matplotlib
 
 RUN mkdir /home/fupi
 RUN mkdir /home/fupi_data
 
-COPY ./.env /home/fupi/.env
-COPY ./fupi.py /home/fupi/fupi.py
+COPY ./.env        /home/fupi/.env
+COPY ./fupi.py     /home/fupi/fupi.py
 COPY ./searcher.py /home/fupi/searcher.py
-COPY ./embedder_docker.py /home/fupi/embedder.py
-COPY ./utilities/models_loader_dev.py /home/fupi/models_loader.py
 
 # Start Fupi Gradio search application by default:
 EXPOSE 7860

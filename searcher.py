@@ -17,9 +17,10 @@ import pandas as pd
 from transformers import AutoTokenizer, M2M100Tokenizer
 import uvicorn
 
-from fupi import model_downloader_from_object_storage
-from fupi import fupi_dense_vectors_searcher
-from fupi import fupi_colbert_centroids_searcher
+from fupi.utils import (model_downloader_from_object_storage, 
+                        fupi_dense_vectors_searcher,
+                        fupi_colbert_centroids_searcher)
+
 
 # Start the application for local development at http://0.0.0.0:7860/ using:
 # docker run --rm -it --user $(id -u):$(id -g) -v $PWD:/app -p 7860:7860 fupi python /app/searcher.py

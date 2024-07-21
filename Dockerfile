@@ -43,7 +43,7 @@ RUN mkdir /home/fupi
 RUN mkdir /home/fupi_data
 
 COPY ./.env        /home/fupi/.env
-COPY ./fupi.py     /home/fupi/fupi.py
+COPY ./fupi        /home/fupi/fupi
 COPY ./searcher.py /home/fupi/searcher.py
 
 # Start Fupi Gradio search application by default:

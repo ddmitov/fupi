@@ -8,6 +8,7 @@ import pandas as pd
 from torch import nn
 from tqdm import tqdm
 import onnxruntime as ort
+from transformers import PreTrainedTokenizer
 from onnxruntime.capi.onnxruntime_inference_collection import InferenceSession
 
 from fupi.data import Dataset
@@ -24,14 +25,25 @@ class Embedder(ABC):
 
 
 class LanceDBEmbedder(ABC):
+    """Creates text and sentence embeddings and saves them into LanceDB.
 
-    def __init__(self, tokenizer, model):
+    Args:
+        tokenizer (PreTrainedTokenizer): HuggingFace tokenizer.
+        model (InferenceSession): ONNX Inference session.
+    """
+
+    def __init__(self, tokenizer: PreTrainedTokenizer, model: InferenceSession):
         self._tokenizer = tokenizer
         self._model = model
 
         self._create_bucket()
 
     def embed(self, dataset: Dataset):
+        """Creates embeddings from dataset and saves them into LanceDB.
+
+        Args:
+            dataset (Dataset): Fupi Dataset object.
+        """
         batches = tqdm(dataset, total=len(dataset))
         batches.set_description("Creating embeddings")
         sentences_list = []

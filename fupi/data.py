@@ -17,6 +17,14 @@ class Dataset(ABC):
 
 
 class HuggingFaceDataset(Dataset):
+    """HuggingFace dataset handler that reads it from a file and splits it into batches of sentences.
+
+    Args:
+        path (str): Path to HuggingFace dataset file.
+        num_samples (int, optional): Number of sample to take. Defaults to -1, which means all samples.
+        batch_size (int, optional): Sentences batch size. Defaults to 1.
+        segmenter (Any, optional): Segmenter to use. Defaults to pysbd.Segmenter.
+    """
 
     def __init__(self, path: str, num_samples: int = -1, batch_size: int = 1, segmenter: Any = None):
         self._path = path

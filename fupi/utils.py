@@ -37,13 +37,13 @@ def lancedb_tables_creator(
 
     # Initialize LanceDB tables:
     text_level_table = lance_db.create_table(
-        'text-level-new',
+        'text-level',
         schema=text_level_table_schema,
         mode='overwrite'
     )
 
     sentence_level_table = lance_db.create_table(
-        'sentence-level-new',
+        'sentence-level',
         schema=sentence_level_table_schema,
         mode='overwrite'
     )

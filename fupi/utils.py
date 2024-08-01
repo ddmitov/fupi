@@ -1,70 +1,13 @@
-#!/usr/bin/env python3
-
-from multiprocessing import cpu_count
 import os
+from multiprocessing import cpu_count
 
 import duckdb
-from huggingface_hub import hf_hub_download
 import lancedb
-from minio import Minio
 import numpy as np
-import onnxruntime as ort
 import pandas as pd
 import pyarrow as pa
-
-
-def model_downloader_from_hugging_face() -> True:
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx',
-        local_dir='/app/data/model',
-        repo_type='model'
-    )
-
-    hf_hub_download(
-        repo_id='ddmitov/bge_m3_dense_colbert_onnx',
-        filename='model.onnx_data',
-        local_dir='/app/data/model',
-        repo_type='model'
-    )
-
-    return True
-
-
-def model_downloader_from_object_storage(
-    bucket_name: str,
-    bucket_prefix: str
-) -> True:
-    endpoint = str(os.environ['AWS_ENDPOINT'])
-    secure_mode = None
-
-    if 'https' in endpoint:
-        endpoint = endpoint.replace('https://', '')
-        secure_mode = True
-    else:
-        endpoint = endpoint.replace('http://', '')
-        secure_mode = False
-
-    client = Minio(
-        endpoint,
-        access_key=os.environ['AWS_ACCESS_KEY_ID'],
-        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-        secure=secure_mode
-    )
-
-    for item in client.list_objects(
-        bucket_name,
-        prefix=bucket_prefix,
-        recursive=True
-    ):
-
-        client.fget_object(
-            bucket_name,
-            item.object_name,
-            '/tmp/' + item.object_name
-        )
-
-    return True
+from minio import Minio
+import onnxruntime as ort
 
 
 def lancedb_tables_creator(
@@ -108,6 +51,35 @@ def lancedb_tables_creator(
     return text_level_table, sentence_level_table
 
 
+def create_dataset_bucket(minio_client: Minio, bucket_name: str):
+    if not minio_client.bucket_exists(bucket_name):
+        minio_client.make_bucket(bucket_name)
+
+        print(f'{bucket_name} bucket was created.')
+
+
+def init_minio() -> Minio:
+    # Initiate MinIO client:
+    endpoint = str(os.environ['AWS_ENDPOINT'])
+    secure_mode = None
+
+    if 'https' in endpoint:
+        endpoint = endpoint.replace('https://', '')
+        secure_mode = True
+    else:
+        endpoint = endpoint.replace('http://', '')
+        secure_mode = False
+    
+    minio_client = Minio(
+        endpoint,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=secure_mode
+    )
+
+    return minio_client
+
+
 def ort_session_starter_for_text_embedding() -> ort.InferenceSession:
     # Set ONNX runtime session configuration:
     onnxrt_options = ort.SessionOptions()
@@ -133,18 +105,40 @@ def ort_session_starter_for_text_embedding() -> ort.InferenceSession:
     return ort_session
 
 
-def centroid_maker_for_arrays(embeddings_list: np.ndarray) -> list:
-    average_embedding_list = np.average(embeddings_list, axis=0).tolist()
+def model_downloader_from_object_storage(
+    bucket_name: str,
+    bucket_prefix: str
+) -> True:
+    endpoint = str(os.environ['AWS_ENDPOINT'])
+    secure_mode = None
 
-    return average_embedding_list
+    if 'https' in endpoint:
+        endpoint = endpoint.replace('https://', '')
+        secure_mode = True
+    else:
+        endpoint = endpoint.replace('http://', '')
+        secure_mode = False
 
+    client = Minio(
+        endpoint,
+        access_key=os.environ['AWS_ACCESS_KEY_ID'],
+        secret_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        secure=secure_mode
+    )
 
-def centroid_maker_for_series(group: pd.Series) -> list:
-    embeddings_list = group.tolist()
+    for item in client.list_objects(
+        bucket_name,
+        prefix=bucket_prefix,
+        recursive=True
+    ):
 
-    average_embedding_list = np.average(embeddings_list, axis=0).tolist()
+        client.fget_object(
+            bucket_name,
+            item.object_name,
+            '/tmp/' + item.object_name
+        )
 
-    return average_embedding_list
+    return True
 
 
 def fupi_dense_vectors_searcher(
@@ -211,7 +205,7 @@ def fupi_colbert_centroids_searcher(
     sentence_level_table: lancedb.table.Table,
     query_colbert_embeddings: np.ndarray
 ) -> pd.DataFrame:
-    query_colbert_centroid = centroid_maker_for_arrays(query_colbert_embeddings)
+    query_colbert_centroid = np.average(query_colbert_embeddings, axis=0).tolist()
 
     colbert_initial_dataframe = sentence_level_table.search(
         query_colbert_centroid,

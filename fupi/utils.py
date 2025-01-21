@@ -142,6 +142,7 @@ def model_downloader_from_object_storage(
 
 
 def fupi_dense_vectors_searcher(
+    text_level_arrow_table: pa.Table,
     sentence_level_table: lancedb.table.Table,
     query_dense_embedding: np.ndarray
 ) -> pd.DataFrame:
@@ -202,6 +203,7 @@ def fupi_dense_vectors_searcher(
 
 
 def fupi_colbert_centroids_searcher(
+    text_level_arrow_table: pa.Table,
     sentence_level_table: lancedb.table.Table,
     query_colbert_embeddings: np.ndarray
 ) -> pd.DataFrame:

@@ -272,6 +272,7 @@ def lancedb_searcher(
         query_dense_embedding = query_embedded[0][0]
 
         search_result_dataframe = fupi_dense_vectors_searcher(
+            text_level_arrow_table,
             sentence_level_table,
             query_dense_embedding
         )
@@ -292,6 +293,7 @@ def lancedb_searcher(
         query_colbert_embeddings = query_embedded[1][0]
 
         search_result_dataframe = fupi_colbert_centroids_searcher(
+            text_level_arrow_table,
             sentence_level_table,
             query_colbert_embeddings
         )
